@@ -2,20 +2,12 @@
 # This configures Railway to deploy the Next.js frontend from apps/web
 
 [build]
-# Use Nixpacks builder (default)
-builder = "nixpacks"
-
-# Build command: install dependencies and build Next.js
-buildCommand = "npm install && cd apps/web && npm run build"
+builder = "DOCKERFILE"
+dockerfilePath = "apps/web/Dockerfile"
 
 [deploy]
-# Start command: run the Next.js production server
-startCommand = "cd apps/web && npm run start"
-
-# Health check configuration
+startCommand = ""
 healthcheckPath = "/api/health"
 healthcheckTimeout = 100
-
-# Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
