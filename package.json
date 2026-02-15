@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "build:web": "cd apps/web && npm install && npm run build",
+    "start:web": "cd apps/web && npm start",
     "start": "node apps/api/src/index.js",
     "dev:api": "node apps/api/src/index.js",
     "dev:realtime": "node apps/realtime/src/index.js",
