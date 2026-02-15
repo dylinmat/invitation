@@ -1,6 +1,4 @@
-# Railway configuration for API service (root service)
-# This runs the API from apps/api
-
+# Railway configuration for API service
 [build]
 builder = "NIXPACKS"
 
@@ -8,4 +6,3 @@ builder = "NIXPACKS"
 startCommand = "node apps/api/src/index.js"
 healthcheckPath = "/api/health"
 healthcheckPort = 4000
-restartPolicyType = "ON_FAILURE"
