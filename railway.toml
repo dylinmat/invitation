@@ -1,13 +1,11 @@
-# Railway configuration for the "web" service
-# This configures Railway to deploy the Next.js frontend from apps/web
+# Railway configuration for API service (root service)
+# This runs the API from apps/api
 
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "apps/web/Dockerfile"
+builder = "NIXPACKS"
 
 [deploy]
-startCommand = ""
+startCommand = "node apps/api/src/index.js"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 100
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
+healthcheckPort = 4000
+restartPolicyType = "ON_FAILURE"

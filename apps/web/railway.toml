@@ -1,0 +1,11 @@
+# Railway configuration for web service
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "node server.js"
+healthcheckPath = "/api/health"
+healthcheckPort = 3000
+restartPolicyType = "ON_FAILURE"
