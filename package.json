@@ -1,0 +1,49 @@
+{
+  "name": "event-invitation-os",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Event Invitation OS - Modern event management platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "node apps/api/src/index.js",
+    "dev:api": "node apps/api/src/index.js",
+    "dev:realtime": "node apps/realtime/src/index.js",
+    "dev:worker": "node apps/worker/src/index.js",
+    "dev:web": "cd apps/web && npm run dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:realtime\" \"npm run dev:worker\" \"npm run dev:web\"",
+    
+    "db:migrate": "node apps/api/src/db/migrate.js",
+    "db:seed": "node apps/api/src/db/seed.js",
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    
+    "railway:migrate": "railway run npm run db:migrate",
+    "railway:seed": "railway run npm run db:seed",
+    
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    
+    "deploy:api": "railway up --service api",
+    "deploy:realtime": "railway up --service realtime",
+    "deploy:worker": "railway up --service worker",
+    "deploy:web": "railway up --service web",
+    "deploy:all": "npm run deploy:api && npm run deploy:realtime && npm run deploy:worker && npm run deploy:web",
+    
+    "status": "railway status",
+    "logs:api": "railway logs --service api",
+    "logs:realtime": "railway logs --service realtime",
+    "logs:worker": "railway logs --service worker",
+    "logs:web": "railway logs --service web"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

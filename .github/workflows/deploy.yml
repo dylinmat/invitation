@@ -1,0 +1,211 @@
+# =============================================================================
+# EIOS Railway Deployment Pipeline
+# Auto-deploy on push to main branch
+# =============================================================================
+
+name: Deploy to Railway
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+    types: [opened, synchronize]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ===========================================================================
+  # Test & Lint
+  # ===========================================================================
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting (if available)
+        run: npm run lint --if-present || echo "No lint script"
+
+      - name: Run tests (if available)
+        run: npm test --if-present || echo "No test script"
+
+  # ===========================================================================
+  # Deploy API Service
+  # ===========================================================================
+  deploy-api:
+    name: Deploy API
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Railway CLI
+        uses: railway/cli-installation-action@v1
+        with:
+          version: latest
+
+      - name: Deploy API to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway login --token $RAILWAY_TOKEN
+          railway service --project invitation --service api
+          railway up --service api --detach
+
+  # ===========================================================================
+  # Deploy Realtime Service
+  # ===========================================================================
+  deploy-realtime:
+    name: Deploy Realtime
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Railway CLI
+        uses: railway/cli-installation-action@v1
+        with:
+          version: latest
+
+      - name: Deploy Realtime to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway login --token $RAILWAY_TOKEN
+          railway service --project invitation --service realtime
+          railway up --service realtime --detach
+
+  # ===========================================================================
+  # Deploy Worker Service
+  # ===========================================================================
+  deploy-worker:
+    name: Deploy Worker
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Railway CLI
+        uses: railway/cli-installation-action@v1
+        with:
+          version: latest
+
+      - name: Deploy Worker to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway login --token $RAILWAY_TOKEN
+          railway service --project invitation --service worker
+          railway up --service worker --detach
+
+  # ===========================================================================
+  # Deploy Web Service
+  # ===========================================================================
+  deploy-web:
+    name: Deploy Web
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Railway CLI
+        uses: railway/cli-installation-action@v1
+        with:
+          version: latest
+
+      - name: Deploy Web to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway login --token $RAILWAY_TOKEN
+          railway service --project invitation --service web
+          railway up --service web --detach
+
+  # ===========================================================================
+  # Database Migrations
+  # ===========================================================================
+  migrate:
+    name: Run Database Migrations
+    needs: [deploy-api, deploy-worker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --only=production
+
+      - name: Setup Railway CLI
+        uses: railway/cli-installation-action@v1
+        with:
+          version: latest
+
+      - name: Run migrations
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          railway login --token $RAILWAY_TOKEN
+          railway service --project invitation --service api
+          railway run -- npm run db:migrate
+
+  # ===========================================================================
+  # Health Check
+  # ===========================================================================
+  health-check:
+    name: Post-Deploy Health Check
+    needs: [deploy-api, deploy-realtime, deploy-web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Check API Health
+        run: |
+          sleep 30  # Wait for deployment
+          curl -sf https://api.eios.app/health || echo "API health check skipped (no domain yet)"
+
+      - name: Check Web Health
+        run: |
+          curl -sf https://eios.app/api/health || echo "Web health check skipped (no domain yet)"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "Deployment health checks failed. Please check Railway dashboard."

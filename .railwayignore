@@ -1,0 +1,41 @@
+# =============================================================================
+# Railway Ignore File
+# Similar to .gitignore but for Railway deployments
+# =============================================================================
+
+# Development files
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.md
+!README.md
+!DEPLOYMENT.md
+!SECURITY.md
+
+# Testing
+coverage
+.nyc_output
+*.test.js
+*.spec.js
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.log
+logs
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (optional - remove if docs needed in deployment)
+docs/
+*.md

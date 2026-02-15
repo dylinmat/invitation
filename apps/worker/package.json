@@ -1,0 +1,29 @@
+{
+  "name": "@eios/worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Event Invitation OS - Worker & Queue System",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
+    "dev:legacy": "node src/index-legacy.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "worker",
+    "queue",
+    "redis",
+    "bullmq",
+    "background-jobs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.18.0",
+    "redis": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

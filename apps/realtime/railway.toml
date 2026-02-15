@@ -1,0 +1,44 @@
+# EIOS Realtime Service - Railway Configuration
+# WebSocket server for real-time collaboration
+
+[build]
+builder = "DOCKER"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = ""
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[deploy.healthcheck]
+path = "/health"
+port = 4100
+protocol = "http"
+interval = 30
+timeout = 10
+healthyThreshold = 2
+unhealthyThreshold = 3
+restartCommand = ""
+
+[deploy.resources]
+cpu = "0.5x"
+memory = "256Mi"
+
+[deploy.variables]
+# Server
+PORT = "4100"
+NODE_ENV = "production"
+LOG_LEVEL = "info"
+
+# Database (from Railway Postgres)
+# DATABASE_URL - injected by Railway
+
+# Redis (from Railway Redis) - Required for Y.js sync
+# REDIS_URL - injected by Railway
+# REDIS_PUBLIC_URL - injected by Railway
+
+# Internal service URLs
+API_INTERNAL_URL = "http://api.railway.internal:4000"
+REALTIME_INTERNAL_URL = "http://realtime.railway.internal:4100"
+WORKER_INTERNAL_URL = "http://worker.railway.internal:4200"
+WEB_INTERNAL_URL = "http://web.railway.internal:3000"
