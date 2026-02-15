@@ -1,8 +1,9 @@
 # Railway configuration for web service
+# Points to root-level Dockerfile
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "Dockerfile.web"
 
 [deploy]
 startCommand = "node server.js"

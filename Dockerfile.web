@@ -1,0 +1,52 @@
+# Dockerfile for EIOS Web (Next.js) - placed at repo root
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Copy root package files first
+COPY package.json package-lock.json* ./
+
+# Copy web app package.json
+COPY apps/web/package.json ./apps/web/
+
+# Install all dependencies (root + web)
+RUN npm ci --legacy-peer-deps
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+
+# Copy all source files
+COPY . .
+
+# Set environment variables for build
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Build the Next.js app
+RUN cd apps/web && npm run build
+
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Copy built application from builder
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./.next/static
+COPY --from=builder /app/apps/web/public ./public
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
