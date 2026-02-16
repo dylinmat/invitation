@@ -10,7 +10,7 @@
   "scripts": {
     "build:web": "cd apps/web && npm install && npm run build",
     "start:web": "cd apps/web && npm start",
-    "start": "node apps/api/src/index.js",
+    "start": "cd apps/web && npm start",
     "dev:api": "node apps/api/src/index.js",
     "dev:realtime": "node apps/realtime/src/index.js",
     "dev:worker": "node apps/worker/src/index.js",
