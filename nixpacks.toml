@@ -1,0 +1,5 @@
+[phases.build]
+cmds = ["cd apps/web && npm install && npx next build"]
+
+[start]
+cmd = "cd apps/web && npx next start -p 3000"
