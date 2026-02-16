@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "prebuild": "node patch-radix-slot.js",
     "build": "next build --no-lint",
     "start": "next start -p 3000",
     "lint": "next lint",
@@ -38,7 +37,7 @@
     "@radix-ui/react-toast": "^1.2.1",
     "@radix-ui/react-tooltip": "^1.1.2",
     "@radix-ui/react-avatar": "^1.1.0",
-    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-slot": "1.0.2",
     "@radix-ui/react-label": "^2.1.0",
     
     "@radix-ui/react-select": "^2.1.1",
