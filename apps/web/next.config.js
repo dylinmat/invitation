@@ -3,6 +3,9 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   
+  // Disable static generation for client-side pages
+  staticPageGenerationTimeout: 0,
+  
   // Skip type checking and linting during build
   typescript: {
     ignoreBuildErrors: true,
