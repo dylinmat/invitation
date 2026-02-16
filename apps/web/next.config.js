@@ -3,9 +3,6 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   
-  // Disable static generation completely
-  staticPageGenerationTimeout: 1,
-  
   // Skip type checking and linting during build
   typescript: {
     ignoreBuildErrors: true,
@@ -34,6 +31,23 @@ const nextConfig = {
   
   // Disable static export for all pages
   trailingSlash: true,
+  
+  // Webpack configuration to fix chunk caching issues
+  webpack: (config, { isServer }) => {
+    // Force new chunk names to avoid cached chunks
+    config.cache = false;
+    
+    if (isServer) {
+      // Disable chunking for server-side to isolate the issue
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: false,
+        minimize: false,
+      };
+    }
+    
+    return config;
+  },
   
   // Redirects
   async redirects() {
