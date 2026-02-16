@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "prebuild": "find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec sed -i 's/React.Children.only(null)/null/g' {} \\; 2>/dev/null || true",
+    "prebuild": "node patch-radix-slot.js",
     "build": "next build --no-lint",
     "start": "next start -p 3000",
     "lint": "next lint",
