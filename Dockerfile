@@ -11,8 +11,8 @@ COPY package-lock.json ./
 RUN npm ci --no-cache
 RUN cd apps/web && npm ci --no-cache
 
-# Patch @radix-ui/react-slot to fix React.Children.only(null) bug
-RUN sed -i 's/React.Children.only(null)/null/g' /app/apps/web/node_modules/@radix-ui/react-slot/dist/index.js
+# Patch ALL @radix-ui/react-slot instances to fix React.Children.only(null) bug
+RUN find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec sed -i 's/React.Children.only(null)/null/g' {} \;
 
 # Copy source code
 COPY . .
