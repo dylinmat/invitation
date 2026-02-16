@@ -1,32 +1,24 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+
+// Create a client-side only QueryClient to avoid SSR issues
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000,
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  });
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000, // 1 minute
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      })
-  );
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return <>{children}</>;
-  }
+  // Use lazy initialization to ensure same QueryClient instance
+  const [queryClient] = useState(createQueryClient);
 
   return (
     <QueryClientProvider client={queryClient}>
