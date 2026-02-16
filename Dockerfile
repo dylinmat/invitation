@@ -5,16 +5,17 @@ WORKDIR /app
 # Copy package files
 COPY package.json ./
 COPY apps/web/package.json ./apps/web/
+COPY package-lock.json ./
 
-# Install dependencies
-RUN npm install
-RUN cd apps/web && npm install
+# Clean install dependencies (no cache)
+RUN npm ci --no-cache
+RUN cd apps/web && npm ci --no-cache
 
 # Copy source code
 COPY . .
 
 # Build the Next.js app
-RUN cd apps/web && npx next build
+RUN cd apps/web && rm -rf .next && npx next build
 
 # Production stage
 FROM node:20-alpine AS runner
