@@ -1,29 +1,27 @@
+# syntax=docker/dockerfile:1
 # Build stage
 FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
-COPY package-lock.json ./
 
-# Clean install dependencies (no cache)
-RUN npm ci --no-cache
-RUN cd apps/web && npm ci --no-cache
+# Clean install dependencies
+RUN npm ci && cd apps/web && npm ci
 
-# Debug: List all react-slot files before patching
-RUN echo "Before patching:" && find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec grep -l "Children.only" {} \;
-
-# Patch ALL @radix-ui/react-slot instances BEFORE building
-RUN find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec sed -i 's/React.Children.only(null)/null/g' {} \;
-
-# Debug: List all react-slot files after patching to verify
-RUN echo "After patching:" && find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec grep -l "Children.only" {} \;
+# Debug and patch react-slot BEFORE building
+RUN echo "=== Finding react-slot files ===" && \
+    find /app -path '*/@radix-ui/react-slot/dist/index.js' 2>/dev/null && \
+    echo "=== Patching react-slot files ===" && \
+    find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec sed -i 's/React.Children.only(null)/null/g' {} \; && \
+    echo "=== Verifying patches ===" && \
+    (find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec grep -l "Children.only" {} \; || echo "No unpatched files found")
 
 # Copy source code
 COPY . .
 
-# Build the Next.js app (the patched slot will be bundled)
+# Build the Next.js app
 RUN cd apps/web && rm -rf .next && npx next build
 
 # Production stage
