@@ -3,8 +3,8 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   
-  // Disable static generation for client-side pages
-  staticPageGenerationTimeout: 0,
+  // Disable static generation completely
+  staticPageGenerationTimeout: 1,
   
   // Skip type checking and linting during build
   typescript: {
@@ -22,6 +22,7 @@ const nextConfig = {
   
   // Image optimization (if using external images)
   images: {
+    unoptimized: true,
     domains: ['localhost', 'web-production-a5a7cc.up.railway.app', 'invitation-production-9f75.up.railway.app'],
     remotePatterns: [
       {
@@ -30,6 +31,9 @@ const nextConfig = {
       },
     ],
   },
+  
+  // Disable static export for all pages
+  trailingSlash: true,
   
   // Redirects
   async redirects() {
