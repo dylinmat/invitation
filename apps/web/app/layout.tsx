@@ -1,25 +1,11 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "@/styles/globals.css";
 import { Providers } from "./providers";
-
-const inter = Inter({ 
-  subsets: ["latin"],
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: "Event Invitation OS - Create Beautiful Digital Invitations",
   description:
-    "Create, manage, and track beautiful digital invitations for your events. Real-time collaboration, RSVP management, and stunning templates.",
-  keywords: [
-    "event invitations",
-    "digital invitations",
-    "RSVP management",
-    "event planning",
-    "wedding invitations",
-    "party invitations",
-  ],
+    "Create, manage, and track beautiful digital invitations for your events.",
 };
 
 export default function RootLayout({
@@ -29,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>
