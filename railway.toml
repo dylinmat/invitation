@@ -1,8 +1,0 @@
-# Railway configuration for API service
-[build]
-builder = "NIXPACKS"
-
-[deploy]
-startCommand = "node apps/api/src/index.js"
-healthcheckPath = "/api/health"
-healthcheckPort = 4000
