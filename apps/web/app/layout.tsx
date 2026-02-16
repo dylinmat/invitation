@@ -8,9 +8,6 @@ const inter = Inter({
   display: 'swap',
 });
 
-// Force dynamic rendering to prevent static generation issues
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: "Event Invitation OS - Create Beautiful Digital Invitations",
   description:

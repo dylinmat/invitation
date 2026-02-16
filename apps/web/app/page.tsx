@@ -145,12 +145,12 @@ export default function LandingPage() {
             covered.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" asChild>
-              <Link href="/auth/login">
+            <Link href="/auth/login">
+              <Button size="lg">
                 Start Creating Free
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+              </Button>
+            </Link>
             <Button size="lg" variant="outline" asChild>
               <Link href="#features">Learn More</Link>
             </Button>
@@ -253,12 +253,12 @@ export default function LandingPage() {
             Join thousands of event planners who trust EIOS for their invitation
             needs. Start free today.
           </p>
-          <Button size="lg" variant="secondary" asChild>
-            <Link href="/auth/login">
+          <Link href="/auth/login">
+            <Button size="lg" variant="secondary">
               Get Started Now
               <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       </section>
 
