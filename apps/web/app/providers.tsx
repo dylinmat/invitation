@@ -1,37 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 
-// Simple wrapper that doesn't use external libraries during SSR
+// Create a singleton query client that persists across renders
+let browserQueryClient: QueryClient | undefined = undefined;
+
+function getQueryClient() {
+  if (typeof window === "undefined") {
+    // Server: always make a new query client
+    return new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 60 * 1000,
+          refetchOnWindowFocus: false,
+          retry: 1,
+        },
+      },
+    });
+  }
+  // Browser: make a new query client if we don't already have one
+  if (!browserQueryClient) {
+    browserQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 60 * 1000,
+          refetchOnWindowFocus: false,
+          retry: 1,
+        },
+      },
+    });
+  }
+  return browserQueryClient;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
-  // Use a simple state to track client-side mount
-  const [mounted] = useState(() => typeof window !== 'undefined');
+  // Use state to ensure we have a query client
+  const [queryClient] = useState(getQueryClient);
+  const [mounted, setMounted] = useState(false);
 
-  // On server, just render children
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // During SSR and initial hydration, render without QueryClientProvider
+  // to avoid hydration mismatches
   if (!mounted) {
     return <>{children}</>;
   }
-
-  // On client, wrap with QueryClientProvider
-  return <ClientProviders>{children}</ClientProviders>;
-}
-
-// Separate component that only loads on client
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-function ClientProviders({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000,
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      })
-  );
 
   return (
     <QueryClientProvider client={queryClient}>
