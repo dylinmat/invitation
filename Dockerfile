@@ -11,13 +11,19 @@ COPY package-lock.json ./
 RUN npm ci --no-cache
 RUN cd apps/web && npm ci --no-cache
 
-# Patch ALL @radix-ui/react-slot instances to fix React.Children.only(null) bug
+# Debug: List all react-slot files before patching
+RUN echo "Before patching:" && find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec grep -l "Children.only" {} \;
+
+# Patch ALL @radix-ui/react-slot instances BEFORE building
 RUN find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec sed -i 's/React.Children.only(null)/null/g' {} \;
+
+# Debug: List all react-slot files after patching to verify
+RUN echo "After patching:" && find /app -path '*/@radix-ui/react-slot/dist/index.js' -exec grep -l "Children.only" {} \;
 
 # Copy source code
 COPY . .
 
-# Build the Next.js app
+# Build the Next.js app (the patched slot will be bundled)
 RUN cd apps/web && rm -rf .next && npx next build
 
 # Production stage
