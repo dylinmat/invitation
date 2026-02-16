@@ -114,12 +114,12 @@ export default function ProjectPage() {
           The project you&apos;re looking for doesn&apos;t exist or you don&apos;t have
           access.
         </p>
-        <Button asChild className="mt-6">
-          <Link href="/dashboard">
+        <Link href="/dashboard" className="mt-6">
+          <Button>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
-          </Link>
-        </Button>
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -141,11 +141,11 @@ export default function ProjectPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboard">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
+            </Button>
+          </Link>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{project.name}</h1>
@@ -161,18 +161,18 @@ export default function ProjectPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/editor/${projectId}`}>
+          <Link href={`/editor/${projectId}`}>
+            <Button variant="outline">
               <Edit className="mr-2 h-4 w-4" />
               Open Editor
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="#" target="_blank">
+            </Button>
+          </Link>
+          <Link href="#" target="_blank">
+            <Button variant="outline">
               <ExternalLink className="mr-2 h-4 w-4" />
               Preview
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -225,11 +225,11 @@ export default function ProjectPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/dashboard/projects/${projectId}/guests`}>
+                <Link href={`/dashboard/projects/${projectId}/guests`}>
+                  <Button variant="outline" className="w-full">
                     Manage Guests
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -244,11 +244,11 @@ export default function ProjectPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/dashboard/projects/${projectId}/invites`}>
+                <Link href={`/dashboard/projects/${projectId}/invites`}>
+                  <Button variant="outline" className="w-full">
                     Manage Invites
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
@@ -263,11 +263,11 @@ export default function ProjectPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/dashboard/projects/${projectId}/sites`}>
+                <Link href={`/dashboard/projects/${projectId}/sites`}>
+                  <Button variant="outline" className="w-full">
                     Manage Sites
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>

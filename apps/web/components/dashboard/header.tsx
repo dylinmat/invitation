@@ -29,7 +29,7 @@ export function DashboardHeader() {
 
         <div className="ml-auto flex items-center space-x-4">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user?.avatar || ""} alt={user?.name || ""} />
@@ -49,12 +49,12 @@ export function DashboardHeader() {
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings">
+              <Link href="/dashboard/settings">
+                <DropdownMenuItem>
                   <User className="mr-2 h-4 w-4" />
                   Profile Settings
-                </Link>
-              </DropdownMenuItem>
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={logout}

@@ -15,15 +15,15 @@ export default function NotFound() {
           The page you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button asChild>
-            <Link href="/">
+          <Link href="/">
+            <Button>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Home
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard">Go to Dashboard</Link>
-          </Button>
+            </Button>
+          </Link>
+          <Link href="/dashboard">
+            <Button variant="outline">Go to Dashboard</Button>
+          </Link>
         </div>
       </div>
     </div>

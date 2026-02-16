@@ -30,11 +30,11 @@ export default function EditorPage() {
         {/* Editor Header */}
         <header className="h-14 border-b flex items-center px-4 justify-between bg-background">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/dashboard">
+            <Link href="/dashboard">
+              <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
+              </Button>
+            </Link>
             <Separator orientation="vertical" className="h-6" />
             <div>
               <h1 className="font-semibold">Visual Editor</h1>
@@ -48,7 +48,7 @@ export default function EditorPage() {
           <div className="flex items-center gap-2">
             {/* Undo/Redo */}
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon">
                   <Undo className="h-4 w-4" />
                 </Button>
@@ -56,7 +56,7 @@ export default function EditorPage() {
               <TooltipContent>Undo</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon">
                   <Redo className="h-4 w-4" />
                 </Button>
@@ -107,7 +107,7 @@ export default function EditorPage() {
           {/* Left Sidebar - Tools */}
           <aside className="w-16 border-r bg-muted/30 flex flex-col items-center py-4 gap-2">
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon" className="rounded-lg">
                   <svg
                     className="w-5 h-5"
@@ -127,7 +127,7 @@ export default function EditorPage() {
               <TooltipContent side="right">Select</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon" className="rounded-lg">
                   <svg
                     className="w-5 h-5"
@@ -147,7 +147,7 @@ export default function EditorPage() {
               <TooltipContent side="right">Image</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon" className="rounded-lg">
                   <svg
                     className="w-5 h-5"
@@ -167,7 +167,7 @@ export default function EditorPage() {
               <TooltipContent side="right">Text</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon" className="rounded-lg">
                   <svg
                     className="w-5 h-5"
@@ -188,7 +188,7 @@ export default function EditorPage() {
             </Tooltip>
             <Separator className="my-2" />
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button variant="ghost" size="icon" className="rounded-lg">
                   <Settings className="w-5 h-5" />
                 </Button>

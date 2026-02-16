@@ -66,17 +66,17 @@ function ProjectCard({ project }: { project: Project }) {
             </CardDescription>
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger>
               <Button variant="ghost" size="icon" className="ml-2 -mr-2">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/dashboard/projects/${project.id}`}>
+              <Link href={`/dashboard/projects/${project.id}`}>
+                <DropdownMenuItem>
                   Open Project
-                </Link>
-              </DropdownMenuItem>
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuItem>
                 <Copy className="mr-2 h-4 w-4" />
                 Duplicate
@@ -207,7 +207,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               New Project

@@ -37,12 +37,12 @@ export default function Error({
             <RefreshCcw className="mr-2 h-4 w-4" />
             Try Again
           </Button>
-          <Button variant="outline" asChild>
-            <Link href="/">
+          <Link href="/">
+            <Button variant="outline">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Home
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

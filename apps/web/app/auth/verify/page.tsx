@@ -105,9 +105,9 @@ function VerifyContent() {
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
                   <XCircle className="w-8 h-8 text-red-600" />
                 </div>
-                <Button asChild className="w-full">
-                  <Link href="/auth/login">Request New Link</Link>
-                </Button>
+                <Link href="/auth/login" className="w-full">
+                  <Button className="w-full">Request New Link</Button>
+                </Link>
               </div>
             )}
           </CardContent>
