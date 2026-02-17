@@ -4,11 +4,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY apps/web/package.json ./apps/web/
 
-# Clean install dependencies
-RUN npm ci && cd apps/web && npm ci
+# Install dependencies (without package-lock.json)
+RUN npm install && cd apps/web && npm install
 
 # Debug and patch react-slot BEFORE building
 RUN echo "=== Finding react-slot files ===" && \
