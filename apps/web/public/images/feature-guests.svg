@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="20" fill="#f0fdf4"/>
+  <!-- People icons -->
+  <g transform="translate(40, 50)">
+    <circle cx="30" cy="25" r="20" fill="#22c55e" opacity="0.2"/>
+    <circle cx="30" cy="20" r="10" fill="#22c55e"/>
+    <path d="M10 55 Q30 35 50 55 V65 H10 Z" fill="#22c55e"/>
+  </g>
+  <g transform="translate(90, 40)">
+    <circle cx="30" cy="25" r="20" fill="#3b82f6" opacity="0.2"/>
+    <circle cx="30" cy="20" r="10" fill="#3b82f6"/>
+    <path d="M10 55 Q30 35 50 55 V65 H10 Z" fill="#3b82f6"/>
+  </g>
+  <g transform="translate(70, 90)">
+    <circle cx="30" cy="25" r="20" fill="#f59e0b" opacity="0.2"/>
+    <circle cx="30" cy="20" r="10" fill="#f59e0b"/>
+    <path d="M10 55 Q30 35 50 55 V65 H10 Z" fill="#f59e0b"/>
+  </g>
+  <!-- Checkmarks -->
+  <circle cx="160" cy="60" r="15" fill="#22c55e"/>
+  <path d="M153 60 L158 65 L167 56" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="160" cy="110" r="15" fill="#22c55e"/>
+  <path d="M153 110 L158 115 L167 106" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- List lines -->
+  <rect x="30" y="140" width="60" height="6" rx="3" fill="#cbd5e1"/>
+  <rect x="30" y="152" width="80" height="6" rx="3" fill="#cbd5e1"/>
+  <rect x="30" y="164" width="50" height="6" rx="3" fill="#cbd5e1"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="20" fill="#eff6ff"/>
+  <!-- Chart background -->
+  <rect x="30" y="40" width="140" height="120" rx="12" fill="#ffffff" stroke="#dbeafe" stroke-width="2"/>
+  <!-- Bar chart -->
+  <rect x="50" y="120" width="20" height="25" rx="4" fill="#3b82f6"/>
+  <rect x="80" y="100" width="20" height="45" rx="4" fill="#6366f1"/>
+  <rect x="110" y="70" width="20" height="75" rx="4" fill="#8b5cf6"/>
+  <rect x="140" y="90" width="20" height="55" rx="4" fill="#a855f7"/>
+  <!-- Line chart overlay -->
+  <path d="M50 100 Q70 80 90 90 T130 70 T150 60" stroke="#f59e0b" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Data points -->
+  <circle cx="60" cy="100" r="5" fill="#f59e0b"/>
+  <circle cx="90" cy="90" r="5" fill="#f59e0b"/>
+  <circle cx="130" cy="70" r="5" fill="#f59e0b"/>
+  <circle cx="150" cy="60" r="5" fill="#f59e0b"/>
+  <!-- Stats badge -->
+  <rect x="120" y="25" width="60" height="30" rx="15" fill="#22c55e"/>
+  <text x="150" y="45" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="bold" fill="white">+47%</text>
+</svg>

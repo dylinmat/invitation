@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="20" fill="#fdf4ff"/>
+  <!-- Template cards -->
+  <g transform="translate(30, 40) rotate(-8)">
+    <rect width="60" height="80" rx="8" fill="#f472b6" opacity="0.3"/>
+    <rect x="10" y="10" width="40" height="60" rx="4" fill="#ffffff"/>
+    <circle cx="30" cy="30" r="12" fill="#f472b6" opacity="0.5"/>
+  </g>
+  <g transform="translate(70, 30) rotate(3)">
+    <rect width="60" height="80" rx="8" fill="#6366f1" opacity="0.3"/>
+    <rect x="10" y="10" width="40" height="60" rx="4" fill="#ffffff"/>
+    <rect x="18" y="25" width="24" height="8" rx="4" fill="#6366f1" opacity="0.5"/>
+    <rect x="18" y="38" width="20" height="4" rx="2" fill="#c7d2fe"/>
+  </g>
+  <g transform="translate(110, 45) rotate(12)">
+    <rect width="60" height="80" rx="8" fill="#22c55e" opacity="0.3"/>
+    <rect x="10" y="10" width="40" height="60" rx="4" fill="#ffffff"/>
+    <polygon points="30,25 38,40 22,40" fill="#22c55e" opacity="0.5"/>
+  </g>
+  <!-- Sparkle -->
+  <text x="160" y="50" font-size="30">✨</text>
+</svg>

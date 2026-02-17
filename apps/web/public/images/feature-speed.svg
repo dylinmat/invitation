@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="20" fill="#fefce8"/>
+  <!-- Lightning bolt -->
+  <path d="M110 40 L70 100 H95 L85 160 L135 90 H105 Z" fill="url(#speedGrad)"/>
+  <defs>
+    <linearGradient id="speedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#facc15"/>
+      <stop offset="100%" style="stop-color:#f97316"/>
+    </linearGradient>
+  </defs>
+  <!-- Speed lines -->
+  <line x1="30" y1="80" x2="60" y2="80" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <line x1="20" y1="100" x2="50" y2="100" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <line x1="30" y1="120" x2="60" y2="120" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <line x1="140" y1="70" x2="170" y2="70" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <line x1="150" y1="90" x2="180" y2="90" stroke="#fcd34d" stroke-width="4" stroke-linecap="round"/>
+  <!-- Clock/speed indicator -->
+  <circle cx="160" cy="140" r="25" fill="#ffffff" stroke="#fbbf24" stroke-width="3"/>
+  <line x1="160" y1="140" x2="160" y2="125" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  <line x1="160" y1="140" x2="172" y2="148" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+  <!-- Fast tag -->
+  <rect x="25" y="150" width="50" height="24" rx="12" fill="#22c55e"/>
+  <text x="50" y="167" text-anchor="middle" font-family="system-ui" font-size="12" font-weight="bold" fill="white">FAST</text>
+</svg>
