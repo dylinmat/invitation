@@ -7,12 +7,10 @@ import {
   Send, 
   Users, 
   CheckCircle2, 
-  Mail, 
   MessageSquare, 
   Calendar,
   BarChart3,
   Bell,
-  Smartphone,
   Heart,
   ArrowRight,
   Check,
@@ -248,6 +246,7 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+          <p className="text-center text-xs text-stone-400 mt-6">*Representative figures from beta users</p>
         </div>
       </section>
 
@@ -308,7 +307,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8">
             {testimonials.map((t, i) => (
               <div key={i} className="bg-stone-800/50 rounded-2xl p-8 border border-stone-700">
-                <p className="text-stone-300 mb-6 leading-relaxed">"{t.quote}"</p>
+                <p className="text-stone-300 mb-6 leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-white">{t.author}</p>
