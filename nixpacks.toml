@@ -1,0 +1,23 @@
+# Nixpacks configuration for Railway - Web Service (Next.js)
+# This configures the "web" service to run the Next.js frontend
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x"]
+
+[phases.build]
+# Build the Next.js app
+buildCommand = """
+npm install && \
+cd apps/web && \
+npm run build
+"""
+
+[phases.start]
+# Start the Next.js server
+startCommand = "cd apps/web && npm run start"
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"
+NEXT_PUBLIC_API_URL = "https://invitation-production-9f75.up.railway.app"
+NEXT_PUBLIC_APP_URL = "https://web-production-a5a7cc.up.railway.app"
