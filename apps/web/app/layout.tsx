@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "@/styles/globals.css";
 import { Providers } from "./providers";
 
 const inter = Inter({ 
   subsets: ["latin"],
   display: 'swap',
+  variable: '--font-inter',
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  display: 'swap',
+  variable: '--font-playfair',
 });
 
 export const metadata: Metadata = {
-  title: "Event Invitation OS - Create Beautiful Digital Invitations",
+  title: "EIOS - Beautiful Online Invitations",
   description:
-    "Create, manage, and track beautiful digital invitations for your events. Real-time collaboration, RSVP management, and stunning templates.",
+    "Create elegant digital invitations for weddings, birthdays, baby showers, and every special moment. Customize and send in minutes.",
   keywords: [
     "event invitations",
     "digital invitations",
@@ -29,7 +36,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${playfair.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>
