@@ -49,14 +49,23 @@ export function DashboardNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+              "flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors",
+              "min-h-[44px] touch-manipulation active:scale-[0.98]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
               isActive
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
+            aria-current={isActive ? "page" : undefined}
           >
-            <item.icon className={cn("mr-3 h-4 w-4", isActive && "text-primary-foreground")} />
-            {item.title}
+            <item.icon 
+              className={cn(
+                "mr-3 h-5 w-5 flex-shrink-0",
+                isActive ? "text-primary-foreground" : ""
+              )} 
+              aria-hidden="true"
+            />
+            <span className="truncate">{item.title}</span>
           </Link>
         );
       })}

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "@/styles/globals.css";
 import { Providers } from "./providers";
+import { CommandPalette } from "@/components/command-palette";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -37,7 +39,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${playfair.variable} font-sans`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <CommandPalette />
+          <OnboardingChecklist />
+        </Providers>
       </body>
     </html>
   );

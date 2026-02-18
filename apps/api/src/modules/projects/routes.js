@@ -7,10 +7,64 @@ const {
   createProject,
   getProjectById,
   listProjectsByUser,
+  listProjectsByOrg,
   updateProject,
   deleteProject,
   getProjectStats
 } = require("./repository");
+
+// Valid IANA timezones - common ones for validation
+const VALID_TIMEZONES = new Set([
+  "UTC", "GMT", "EST", "CST", "MST", "PST", "AST", "HST",
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Anchorage", "America/Honolulu", "America/Phoenix", "America/Toronto",
+  "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Moscow", "Europe/Rome",
+  "Europe/Madrid", "Europe/Amsterdam", "Europe/Vienna", "Europe/Stockholm",
+  "Asia/Tokyo", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore", "Asia/Seoul",
+  "Asia/Mumbai", "Asia/Dubai", "Asia/Bangkok", "Asia/Jakarta", "Asia/Manila",
+  "Australia/Sydney", "Australia/Melbourne", "Australia/Brisbane", "Australia/Perth",
+  "Pacific/Auckland", "Pacific/Fiji", "Pacific/Honolulu",
+  "Africa/Johannesburg", "Africa/Cairo", "Africa/Lagos", "Africa/Nairobi",
+  "America/Sao_Paulo", "America/Buenos_Aires", "America/Santiago", "America/Lima",
+  "America/Mexico_City", "America/Bogota", "America/Caracas"
+]);
+
+/**
+ * Validate timezone string
+ * @param {string} timezone - Timezone to validate
+ * @returns {boolean}
+ */
+const isValidTimezone = (timezone) => {
+  if (!timezone || typeof timezone !== "string") return false;
+  if (VALID_TIMEZONES.has(timezone)) return true;
+  
+  // Try to validate using Intl API if available
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Validate project name
+ * @param {string} name - Project name to validate
+ * @returns {{valid: boolean, error?: string}}
+ */
+const validateProjectName = (name) => {
+  if (!name || typeof name !== "string") {
+    return { valid: false, error: "Project name is required" };
+  }
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: "Project name cannot be empty" };
+  }
+  if (trimmed.length > 100) {
+    return { valid: false, error: "Project name must be 100 characters or less" };
+  }
+  return { valid: true };
+};
 
 // Helper to format error responses consistently
 const formatError = (statusCode, error, message) => ({
@@ -140,7 +194,7 @@ async function registerProjectsRoutes(fastify) {
         type: "object",
         required: ["name"],
         properties: {
-          name: { type: "string" },
+          name: { type: "string", minLength: 1, maxLength: 100 },
           description: { type: "string" },
           eventDate: { type: "string" },
           timezone: { type: "string", default: "UTC" }
@@ -148,28 +202,71 @@ async function registerProjectsRoutes(fastify) {
       }
     }
   }, async (request, reply) => {
-    const { name, description, eventDate, timezone = "UTC" } = request.body;
+    try {
+      const { name, description, eventDate, timezone = "UTC" } = request.body;
 
-    // Get user's organization (use first one for now)
-    const { listUserOrganizations } = require("../auth/repository");
-    const orgs = await listUserOrganizations(request.user.id);
-    
-    if (orgs.length === 0) {
-      reply.status(400);
-      return formatError(400, "Bad Request", "User must belong to an organization to create a project");
+      // Validate project name
+      const nameValidation = validateProjectName(name);
+      if (!nameValidation.valid) {
+        reply.status(400);
+        return formatError(400, "Bad Request", nameValidation.error);
+      }
+
+      // Validate timezone
+      if (!isValidTimezone(timezone)) {
+        reply.status(400);
+        return formatError(400, "Bad Request", `Invalid timezone: ${timezone}`);
+      }
+
+      // Get user's organization (use first one for now)
+      const { listUserOrganizations } = require("../auth/repository");
+      const orgs = await listUserOrganizations(request.user.id);
+      
+      if (orgs.length === 0) {
+        reply.status(400);
+        return formatError(400, "Bad Request", "User must belong to an organization to create a project");
+      }
+
+      const orgId = orgs[0].id;
+      const trimmedName = name.trim();
+
+      // Check for duplicate project name within the same organization
+      const existingProjects = await listProjectsByOrg(orgId);
+      const duplicateName = existingProjects.find(
+        p => p.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+      
+      if (duplicateName) {
+        reply.status(409);
+        return formatError(409, "Conflict", `A project with the name "${trimmedName}" already exists in this organization`);
+      }
+
+      const project = await createProject({
+        orgId,
+        name: trimmedName,
+        timezone,
+        createdBy: request.user.id
+      });
+
+      // Add audit log entry
+      if (request.audit) {
+        request.audit({
+          action: "project.created",
+          targetType: "project",
+          targetId: project.id,
+          metadata: { name: trimmedName, timezone }
+        });
+      }
+
+      reply.status(201);
+      return formatSuccess({
+        project: transformProject(project)
+      }, "Project created successfully");
+    } catch (error) {
+      fastify.log.error({ err: error.message }, "Error creating project");
+      reply.status(500);
+      return formatError(500, "Internal Server Error", "An error occurred while creating the project");
     }
-
-    const project = await createProject({
-      orgId: orgs[0].id,
-      name,
-      timezone,
-      createdBy: request.user.id
-    });
-
-    reply.status(201);
-    return formatSuccess({
-      project: transformProject(project)
-    }, "Project created successfully");
   });
 
   /**

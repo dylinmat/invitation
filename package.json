@@ -8,16 +8,18 @@
     "packages/*"
   ],
   "scripts": {
+    "build:api": "cd apps/api && npm run build",
     "build:web": "cd apps/web && npm install && npm run build",
+    "start:api": "cd apps/api && npm start",
     "start:web": "cd apps/web && npm start",
     "start": "cd apps/web && npm start",
-    "dev:api": "node apps/api/src/index.js",
+    "dev:api": "cd apps/api && npm run dev",
     "dev:realtime": "node apps/realtime/src/index.js",
     "dev:worker": "node apps/worker/src/index.js",
     "dev:web": "cd apps/web && npm run dev",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:realtime\" \"npm run dev:worker\" \"npm run dev:web\"",
     
-    "db:migrate": "node apps/api/src/db/migrate.js",
+    "db:migrate": "cd apps/api && npm run migrate",
     "db:seed": "node apps/api/src/db/seed.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
     
@@ -39,7 +41,10 @@
     "logs:api": "railway logs --service api",
     "logs:realtime": "railway logs --service realtime",
     "logs:worker": "railway logs --service worker",
-    "logs:web": "railway logs --service web"
+    "logs:web": "railway logs --service web",
+    
+    "typecheck:api": "cd apps/api && npm run typecheck",
+    "typecheck": "npm run typecheck:api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

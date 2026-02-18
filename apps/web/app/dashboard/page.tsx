@@ -1,25 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Calendar, Users, Mail, MoreHorizontal, Copy, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -31,125 +14,126 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { projectsApi, Project } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { projectsApi } from "@/lib/api";
+import { showToast } from "@/components/ui/toaster";
 
-function ProjectCard({ project }: { project: Project }) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "success";
-      case "draft":
-        return "secondary";
-      case "archived":
-        return "default";
-      default:
-        return "secondary";
+// Dashboard components
+import { KPIDashboard } from "@/components/dashboard/kpi-dashboard";
+import { ProjectCard } from "@/components/dashboard/project-card";
+import { FilterBar } from "@/components/dashboard/filter-bar";
+import { BulkActionsToolbar } from "@/components/dashboard/bulk-actions-toolbar";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { ProjectGridSkeleton } from "@/components/dashboard/project-skeleton";
+
+// Dashboard hooks
+import {
+  useProjectFilters,
+  useFilteredProjects,
+  useBulkProjectActions,
+} from "@/hooks/useDashboard";
+
+// Create Project Dialog Component
+function CreateProjectDialog({
+  onSuccess,
+}: {
+  onSuccess: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await projectsApi.create({
+        name: name.trim(),
+        description: description.trim() || undefined,
+      });
+      showToast({
+        title: "Project created",
+        description: "Your new project has been created successfully.",
+        variant: "success",
+      });
+      setIsOpen(false);
+      setName("");
+      setDescription("");
+      onSuccess();
+    } catch {
+      showToast({
+        title: "Failed to create project",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <Card className="group hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <Link href={`/dashboard/projects/${project.id}`}>
-              <CardTitle className="text-lg truncate hover:text-primary transition-colors">
-                {project.name}
-              </CardTitle>
-            </Link>
-            <CardDescription className="line-clamp-2 mt-1">
-              {project.description || "No description"}
-            </CardDescription>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          New Project
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create New Project</DialogTitle>
+          <DialogDescription>
+            Start a new event invitation project. You can add details later.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Project Name</Label>
+              <Input
+                id="name"
+                placeholder="e.g., Sarah & John's Wedding"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Input
+                id="description"
+                placeholder="Brief description of the event"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="ghost" size="icon" className="ml-2 -mr-2">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <Link href={`/dashboard/projects/${project.id}`}>
-                <DropdownMenuItem>
-                  Open Project
-                </DropdownMenuItem>
-              </Link>
-              <DropdownMenuItem>
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent className="pb-3">
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          {project.eventDate ? (
-            <div className="flex items-center">
-              <Calendar className="mr-1 h-4 w-4" />
-              {formatDate(project.eventDate)}
-            </div>
-          ) : (
-            <div className="flex items-center">
-              <Calendar className="mr-1 h-4 w-4" />
-              No date set
-            </div>
-          )}
-        </div>
-        {project.stats && (
-          <div className="flex items-center gap-4 mt-3 pt-3 border-t">
-            <div className="flex items-center text-sm">
-              <Users className="mr-1 h-4 w-4 text-muted-foreground" />
-              <span>{project.stats.totalGuests}</span>
-            </div>
-            <div className="flex items-center text-sm">
-              <Mail className="mr-1 h-4 w-4 text-muted-foreground" />
-              <span>{project.stats.totalInvites}</span>
-            </div>
-            {project.stats.rsvpYes > 0 && (
-              <Badge variant="success" className="text-xs">
-                {project.stats.rsvpYes} Yes
-              </Badge>
-            )}
-          </div>
-        )}
-      </CardContent>
-      <CardFooter className="pt-0">
-        <Badge variant={getStatusColor(project.status)}>{project.status}</Badge>
-      </CardFooter>
-    </Card>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!name.trim() || isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Project"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function ProjectSkeleton() {
-  return (
-    <Card>
-      <CardHeader>
-        <Skeleton className="h-5 w-3/4" />
-        <Skeleton className="h-4 w-full mt-2" />
-      </CardHeader>
-      <CardContent>
-        <Skeleton className="h-4 w-24" />
-        <div className="flex gap-4 mt-3 pt-3 border-t">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-16" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
+// Main Dashboard Page
 export default function DashboardPage() {
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
   const [mounted, setMounted] = useState(false);
   const { isAuthenticated } = useAuth();
 
@@ -158,128 +142,199 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // Only enable query after client mount and when authenticated
-  const { data, isLoading } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => projectsApi.list(),
-    enabled: mounted && isAuthenticated,
-  });
+  // Filters hook
+  const {
+    filters,
+    setSearch,
+    toggleStatus,
+    clearStatusFilter,
+    setSortBy,
+    toggleSortOrder,
+    clearFilters,
+    hasActiveFilters,
+  } = useProjectFilters();
 
-  const handleCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement project creation
-    setIsCreateOpen(false);
-    setNewProjectName("");
+  // Filtered projects hook
+  const {
+    projects,
+    isLoading: isProjectsLoading,
+    total,
+    refetch: refetchProjects,
+  } = useFilteredProjects(filters);
+
+  // Bulk actions hook
+  const {
+    selectedIds,
+    selectedCount,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    isSelected,
+    handleDelete,
+    handleArchive,
+    handleDuplicate,
+    isProcessing,
+  } = useBulkProjectActions();
+
+  // Handlers for individual project actions
+  const handleDeleteProject = async (id: string) => {
+    try {
+      await handleDelete([id]);
+      showToast({
+        title: "Project deleted",
+        description: "The project has been deleted successfully.",
+        variant: "success",
+      });
+    } catch {
+      showToast({
+        title: "Failed to delete project",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleArchiveProject = async (id: string) => {
+    try {
+      await handleArchive([id]);
+      showToast({
+        title: "Project archived",
+        description: "The project has been archived successfully.",
+        variant: "success",
+      });
+    } catch {
+      showToast({
+        title: "Failed to archive project",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDuplicateProject = async (id: string) => {
+    try {
+      await handleDuplicate([id]);
+      showToast({
+        title: "Project duplicated",
+        description: "The project has been duplicated successfully.",
+        variant: "success",
+      });
+    } catch {
+      showToast({
+        title: "Failed to duplicate project",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Select all visible projects
+  const handleSelectAll = () => {
+    if (selectedCount === projects.length) {
+      clearSelection();
+    } else {
+      selectAll(projects.map((p) => p.id));
+    }
   };
 
   // Show loading state during SSR or before mount
   if (!mounted) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage your event invitations and track RSVPs
-            </p>
-          </div>
-          <Button disabled>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <ProjectSkeleton key={i} />
-          ))}
-        </div>
+      <div className="space-y-8">
+        <div className="h-24 bg-muted/20 rounded-xl animate-pulse" />
+        <div className="h-20 bg-muted/20 rounded-xl animate-pulse" />
+        <ProjectGridSkeleton count={6} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+          <h1
+            className="text-3xl font-bold tracking-tight"
+            style={{ fontFamily: "var(--font-playfair), Georgia, serif" }}
+          >
+            Dashboard
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Manage your event invitations and track RSVPs
+            Manage your events and track RSVPs in one place
           </p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>
-                Start a new event invitation project. You can add details later.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateProject}>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Project Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., Sarah & John's Wedding"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={!newProjectName.trim()}>
-                  Create Project
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <CreateProjectDialog onSuccess={refetchProjects} />
       </div>
 
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <ProjectSkeleton key={i} />
-          ))}
-        </div>
-      ) : data?.projects.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6 text-muted-foreground" />
+      {/* KPI Dashboard */}
+      <section>
+        <KPIDashboard />
+      </section>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Projects Section */}
+        <div className="xl:col-span-3 space-y-4">
+          {/* Filter Bar */}
+          <FilterBar
+            filters={filters}
+            onSearchChange={setSearch}
+            onStatusToggle={toggleStatus}
+            onClearStatus={clearStatusFilter}
+            onSortByChange={setSortBy}
+            onSortOrderToggle={toggleSortOrder}
+            onClearFilters={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            resultCount={projects.length}
+            totalCount={total}
+          />
+
+          {/* Bulk Actions Toolbar */}
+          <BulkActionsToolbar
+            selectedCount={selectedCount}
+            totalCount={projects.length}
+            onSelectAll={handleSelectAll}
+            onClearSelection={clearSelection}
+            onDelete={() => handleDelete(selectedIds)}
+            onArchive={() => handleArchive(selectedIds)}
+            onDuplicate={() => handleDuplicate(selectedIds)}
+            isProcessing={isProcessing}
+          />
+
+          {/* Projects Grid */}
+          {isProjectsLoading ? (
+            <ProjectGridSkeleton count={6} />
+          ) : projects.length === 0 ? (
+            <EmptyState
+              type={hasActiveFilters ? "no-results" : "no-projects"}
+              onCreateClick={() => {}}
+              onClearFilters={clearFilters}
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  isSelected={isSelected(project.id)}
+                  onSelect={toggleSelection}
+                  onDelete={handleDeleteProject}
+                  onArchive={handleArchiveProject}
+                  onDuplicate={handleDuplicateProject}
+                  showCheckbox={true}
+                />
+              ))}
             </div>
-            <h3 className="font-semibold text-lg">No projects yet</h3>
-            <p className="text-muted-foreground text-center max-w-sm mt-1 mb-4">
-              Create your first project to start designing beautiful invitations
-              and managing your guest list.
-            </p>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First Project
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {data?.projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
+          )}
         </div>
-      )}
+
+        {/* Sidebar - Activity Feed */}
+        <div className="xl:col-span-1">
+          <div className="sticky top-6">
+            <ActivityFeed />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

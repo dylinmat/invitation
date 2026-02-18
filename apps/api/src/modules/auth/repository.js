@@ -29,7 +29,7 @@ const createUser = async ({ email, fullName, locale = "en" }) => {
 
 const getUserById = async (id) => {
   const result = await query(
-    "select id, email, full_name, locale, created_at from users where id = $1",
+    "select id, email, full_name, avatar, locale, created_at, updated_at from users where id = $1",
     [id]
   );
   return result.rows[0] || null;
@@ -37,14 +37,14 @@ const getUserById = async (id) => {
 
 const getUserByEmail = async (email) => {
   const result = await query(
-    "select id, email, full_name, locale, created_at from users where email = $1",
+    "select id, email, full_name, avatar, locale, created_at, updated_at from users where email = $1",
     [email.toLowerCase().trim()]
   );
   return result.rows[0] || null;
 };
 
 const updateUser = async (id, updates) => {
-  const allowedFields = ["full_name", "locale"];
+  const allowedFields = ["full_name", "locale", "avatar"];
   const fields = [];
   const values = [];
   let paramIndex = 1;

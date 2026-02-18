@@ -3,36 +3,46 @@
  * Combines Helmet for security headers and Rate Limiting for request throttling
  */
 
-const helmet = require("@fastify/helmet");
-const rateLimit = require("@fastify/rate-limit");
-const Redis = require("ioredis");
-const { SECURITY, RATE_LIMIT, REDIS } = require("../config");
+import { FastifyInstance, FastifyPluginAsync } from "fastify";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
+import Redis from "ioredis";
+import { SECURITY, RATE_LIMIT, REDIS } from "../config";
+
+interface HelmetOptions {
+  contentSecurityPolicy?: object | boolean;
+  hsts?: object | boolean;
+  referrerPolicy?: object;
+  hidePoweredBy?: boolean;
+  noSniff?: boolean;
+  frameguard?: object;
+  xssFilter?: boolean;
+}
+
+interface RateLimitContext {
+  max: number;
+  ttl: number;
+}
 
 /**
  * Create Redis client for rate limiting
- * @returns {Redis|null}
  */
-function createRedisClient() {
-  // Check if Redis URL is configured
-  const redisUrl = REDIS.URL;
-  
-  if (redisUrl) {
+function createRedisClient(): Redis | null {
+  if (REDIS.URL) {
     try {
-      return new Redis(redisUrl, {
+      return new Redis(REDIS.URL, {
         maxRetriesPerRequest: REDIS.MAX_RETRIES,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * REDIS.RETRY_DELAY, 2000);
-          return delay;
+        retryStrategy: (times: number) => {
+          return Math.min(times * REDIS.RETRY_DELAY, 2000);
         },
         connectTimeout: REDIS.CONNECT_TIMEOUT,
         keyPrefix: REDIS.KEY_PREFIX + RATE_LIMIT.NAMESPACE,
       });
     } catch (error) {
-      console.warn("Failed to connect to Redis, falling back to memory store:", error.message);
+      console.warn("Failed to connect to Redis, falling back to memory store:", (error as Error).message);
     }
   }
   
-  // Fallback to individual config
   if (REDIS.HOST && REDIS.PORT) {
     try {
       return new Redis({
@@ -41,29 +51,25 @@ function createRedisClient() {
         password: REDIS.PASSWORD,
         db: REDIS.DB,
         maxRetriesPerRequest: REDIS.MAX_RETRIES,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * REDIS.RETRY_DELAY, 2000);
-          return delay;
+        retryStrategy: (times: number) => {
+          return Math.min(times * REDIS.RETRY_DELAY, 2000);
         },
         connectTimeout: REDIS.CONNECT_TIMEOUT,
         keyPrefix: REDIS.KEY_PREFIX + RATE_LIMIT.NAMESPACE,
       });
     } catch (error) {
-      console.warn("Failed to connect to Redis, falling back to memory store:", error.message);
+      console.warn("Failed to connect to Redis, falling back to memory store:", (error as Error).message);
     }
   }
   
-  // No Redis available - rate limit will use memory store
   return null;
 }
 
 /**
  * Register Helmet security headers plugin
- * @param {import('fastify').FastifyInstance} fastify
- * @param {Object} options
  */
-async function registerHelmet(fastify, options = {}) {
-  const helmetOptions = {
+export async function registerHelmet(fastify: FastifyInstance, options: HelmetOptions = {}): Promise<void> {
+  await fastify.register(helmet, {
     contentSecurityPolicy: options.contentSecurityPolicy ?? SECURITY.CONTENT_SECURITY_POLICY,
     hsts: options.hsts ?? SECURITY.HSTS,
     referrerPolicy: options.referrerPolicy ?? SECURITY.REFERRER_POLICY,
@@ -73,30 +79,25 @@ async function registerHelmet(fastify, options = {}) {
     xssFilter: options.xssFilter ?? SECURITY.XSS_FILTER,
     
     // Additional security headers
-    crossOriginEmbedderPolicy: false, // Disabled for compatibility
+    crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
     dnsPrefetchControl: { allow: false },
     ieNoOpen: true,
     originAgentCluster: true,
     permittedCrossDomainPolicies: { permittedPolicies: "none" },
-  };
-  
-  await fastify.register(helmet, helmetOptions);
+  });
   
   fastify.log.debug("Helmet security plugin registered");
 }
 
 /**
  * Register Rate Limit plugin
- * @param {import('fastify').FastifyInstance} fastify
- * @param {Object} options
  */
-async function registerRateLimit(fastify, options = {}) {
-  // Create Redis client for distributed rate limiting
+export async function registerRateLimit(fastify: FastifyInstance): Promise<void> {
   const redis = createRedisClient();
   
   if (redis) {
-    redis.on("error", (err) => {
+    redis.on("error", (err: Error) => {
       fastify.log.warn({ err }, "Redis connection error in rate limiter");
     });
     
@@ -104,26 +105,19 @@ async function registerRateLimit(fastify, options = {}) {
       fastify.log.info("Rate limiter connected to Redis");
     });
     
-    // Store redis client for cleanup
     fastify.decorate("rateLimitRedis", redis);
   }
   
-  const rateLimitOptions = {
-    // Store configuration - using memory store for now
-    // Redis store requires a custom store class implementation
-    // store: redis ? redis : undefined,
+  // Register rate limit with minimal options - using any for options due to type mismatch
+  const rateLimitOptions: Record<string, unknown> = {
+    max: RATE_LIMIT.MAX,
+    timeWindow: RATE_LIMIT.WINDOW_MS,
     
-    // Default rate limit settings
-    max: options.max ?? RATE_LIMIT.MAX,
-    timeWindow: options.windowMs ?? RATE_LIMIT.WINDOW_MS,
-    
-    // Key generator - uses IP by default, can be customized
-    keyGenerator: (req) => {
-      // Use user ID if authenticated, otherwise use IP
-      if (req.user && req.user.id) {
-        return `user:${req.user.id}`;
+    keyGenerator: (req: import("fastify").FastifyRequest) => {
+      const user = (req as import("fastify").FastifyRequest & { user?: { id: string } }).user;
+      if (user?.id) {
+        return `user:${user.id}`;
       }
-      // Use correlation ID if available (for tracking)
       const correlationId = req.headers["x-correlation-id"];
       if (correlationId) {
         return `corr:${correlationId}`;
@@ -131,22 +125,20 @@ async function registerRateLimit(fastify, options = {}) {
       return req.ip;
     },
     
-    // Skip certain requests
     skipOnError: false,
     
-    // Custom response when rate limited
-    errorResponseBuilder: (req, context) => {
+    errorResponseBuilder: (_req: import("fastify").FastifyRequest, context: RateLimitContext) => {
       return {
         statusCode: 429,
-        error: "Too Many Requests",
+        error: "RATE_LIMITED",
         message: RATE_LIMIT.ERROR_MESSAGE,
         retryAfter: Math.ceil(context.ttl / 1000),
         limit: context.max,
         remaining: 0,
+        code: "RATE_LIMITED",
       };
     },
     
-    // Add rate limit headers
     addHeadersOnExceeding: {
       "x-ratelimit-limit": true,
       "x-ratelimit-remaining": true,
@@ -159,72 +151,56 @@ async function registerRateLimit(fastify, options = {}) {
       "retry-after": true,
     },
     
-    // Hook for custom rate limit logic per route
     hook: "onRequest",
     
-    // Custom skip function
-    skip: (req) => {
-      // Skip health checks from rate limiting
+    skip: (req: import("fastify").FastifyRequest) => {
       if (req.url === "/health" || req.url === "/ready") {
         return true;
       }
-      // Skip if explicitly disabled for this route
-      if (req.routeOptions?.config?.rateLimit === false) {
+      const config = (req.routeOptions?.config as { rateLimit?: boolean }) || {};
+      if (config.rateLimit === false) {
         return true;
       }
       return false;
     },
     
-    // Allow on redis error (fail open vs fail closed)
     allowList: [],
   };
   
-  await fastify.register(rateLimit, rateLimitOptions);
+  await fastify.register(rateLimit as FastifyPluginAsync, rateLimitOptions);
   
   fastify.log.debug("Rate limit plugin registered");
 }
 
 /**
  * Register per-route rate limit overrides
- * This should be called after routes are registered
- * @param {import('fastify').FastifyInstance} fastify
  */
-async function registerRateLimitOverrides(fastify) {
+export async function registerRateLimitOverrides(fastify: FastifyInstance): Promise<void> {
   const overrides = RATE_LIMIT.OVERRIDES;
   
-  for (const [route, config] of Object.entries(overrides)) {
-    // Store route-specific config that can be accessed by the rate limiter
-    fastify.addHook("onRoute", (routeOptions) => {
+  fastify.addHook("onRoute", (routeOptions: import("fastify").RouteOptions) => {
+    for (const [route, config] of Object.entries(overrides)) {
       if (routeOptions.url === route || 
-          routeOptions.url.startsWith(route.replace(/:\w+/g, ""))) {
+          (routeOptions.url && routeOptions.url.startsWith(route.replace(/:\w+/g, "")))) {
         routeOptions.config = routeOptions.config || {};
-        routeOptions.config.rateLimit = {
+        (routeOptions.config as Record<string, unknown>).rateLimit = {
           max: config.max,
           timeWindow: config.windowMs,
         };
       }
-    });
-  }
+    }
+  });
   
   fastify.log.debug("Rate limit overrides registered");
 }
 
 /**
  * Register all security plugins
- * @param {import('fastify').FastifyInstance} fastify
- * @param {Object} options
  */
-async function registerSecurity(fastify, options = {}) {
+export async function registerSecurity(fastify: FastifyInstance, options: { helmet?: HelmetOptions } = {}): Promise<void> {
   await registerHelmet(fastify, options.helmet);
-  await registerRateLimit(fastify, options.rateLimit);
+  await registerRateLimit(fastify);
   await registerRateLimitOverrides(fastify);
   
   fastify.log.info("Security plugins registered");
 }
-
-module.exports = {
-  registerHelmet,
-  registerRateLimit,
-  registerRateLimitOverrides,
-  registerSecurity,
-};

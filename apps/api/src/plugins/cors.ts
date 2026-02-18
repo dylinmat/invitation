@@ -3,20 +3,30 @@
  * Cross-Origin Resource Sharing configuration for EIOS API
  */
 
-const cors = require("@fastify/cors");
-const { CORS } = require("../config");
+import { FastifyInstance } from "fastify";
+import cors from "@fastify/cors";
+import { CORS } from "../config";
+
+interface CorsOptions {
+  origin?: string[] | boolean | string;
+  methods?: string[];
+  allowedHeaders?: string[];
+  exposedHeaders?: string[];
+  credentials?: boolean;
+  maxAge?: number;
+}
 
 /**
  * Register CORS plugin with Fastify
- * @param {import('fastify').FastifyInstance} fastify
- * @param {Object} options
  */
-async function registerCors(fastify, options = {}) {
-  // Determine origin based on configuration
+export async function registerCors(
+  fastify: FastifyInstance,
+  options: CorsOptions = {}
+): Promise<void> {
   const origin = options.origin ?? CORS.ORIGIN;
   
   await fastify.register(cors, {
-    origin: (originValue, callback) => {
+    origin: (originValue: string | undefined, callback: (error: Error | null, allow: boolean) => void) => {
       // Handle array of allowed origins
       if (Array.isArray(origin)) {
         // Allow requests with no origin (mobile apps, curl, etc.)
@@ -30,9 +40,6 @@ async function registerCors(fastify, options = {}) {
           if (typeof allowed === "string") {
             return allowed === originValue;
           }
-          if (allowed instanceof RegExp) {
-            return allowed.test(originValue);
-          }
           return false;
         });
         
@@ -45,7 +52,7 @@ async function registerCors(fastify, options = {}) {
       }
       
       // Handle boolean or function origins
-      callback(null, origin);
+      callback(null, origin as boolean);
     },
     
     methods: options.methods ?? CORS.METHODS,
@@ -57,13 +64,9 @@ async function registerCors(fastify, options = {}) {
     // Preflight handling
     preflight: true,
     strictPreflight: true,
-    
-    // Add custom headers to preflight response
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
   
   fastify.log.debug("CORS plugin registered");
 }
-
-module.exports = { registerCors };

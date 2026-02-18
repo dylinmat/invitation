@@ -239,6 +239,24 @@ export const projectsApi = {
 
   // Duplicate project
   duplicate: (id: string) => api.post<Project>(`/projects/${id}/duplicate`),
+
+  // Bulk delete projects
+  bulkDelete: (ids: string[]) =>
+    api.post<void>("/projects/bulk-delete", { ids }),
+
+  // Bulk archive projects
+  bulkArchive: (ids: string[]) =>
+    api.post<void>("/projects/bulk-archive", { ids }),
+
+  // Get dashboard stats
+  getDashboardStats: () =>
+    api.get<{
+      totalProjects: number;
+      totalGuests: number;
+      totalInvitesSent: number;
+      averageRSVPRate: number;
+      upcomingEventsCount: number;
+    }>("/projects/dashboard-stats"),
 };
 
 // ====================
