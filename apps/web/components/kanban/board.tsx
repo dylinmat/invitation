@@ -490,7 +490,7 @@ export function KanbanBoard({
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "board" | "list")}>
             <TabsList className="h-9">
               <TabsTrigger value="board" className="gap-2">
-                <LayoutKanban className="h-4 w-4" />
+                <Columns className="h-4 w-4" />
                 Board
               </TabsTrigger>
               <TabsTrigger value="list" className="gap-2">

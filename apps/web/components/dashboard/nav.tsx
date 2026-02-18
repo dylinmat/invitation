@@ -22,7 +22,7 @@ const navItems = [
   {
     title: "Board",
     href: "/dashboard/board",
-    icon: LayoutKanban,
+    icon: Columns,
   },
   {
     title: "Analytics",

@@ -340,7 +340,7 @@ export default function BoardPage() {
               className="text-2xl font-bold tracking-tight flex items-center gap-2"
               style={{ fontFamily: "var(--font-playfair), Georgia, serif" }}
             >
-              <LayoutKanban className="h-6 w-6" />
+              <Columns className="h-6 w-6" />
               Project Board
             </h1>
             <p className="text-muted-foreground text-sm mt-0.5">
