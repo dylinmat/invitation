@@ -210,6 +210,7 @@ export type Project = {
   createdAt: string;
   updatedAt: string;
   orgId: string;
+  ownerOrgId?: string;
   settings: ProjectSettings;
   stats?: {
     totalGuests: number;

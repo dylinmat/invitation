@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, LayoutKanban } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -263,7 +264,15 @@ export default function DashboardPage() {
             Manage your events and track RSVPs in one place
           </p>
         </div>
-        <CreateProjectDialog onSuccess={refetchProjects} />
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/board">
+            <Button variant="outline" className="gap-2">
+              <LayoutKanban className="h-4 w-4" />
+              Board View
+            </Button>
+          </Link>
+          <CreateProjectDialog onSuccess={refetchProjects} />
+        </div>
       </div>
 
       {/* KPI Dashboard */}
