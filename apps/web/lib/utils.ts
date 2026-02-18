@@ -132,80 +132,27 @@ export function downloadFile(content: string, filename: string, type = "text/pla
   URL.revokeObjectURL(url);
 }
 
-// Highlight text matching a search query
+// Highlight text matching a search query - returns HTML string
 export function highlightText(
   text: string,
   query: string,
   highlightClass = "bg-rose-200 text-rose-900 rounded px-0.5"
-): React.ReactNode {
+): string {
   if (!query) return text;
 
-  const parts: { text: string; match: boolean }[] = [];
   const textLower = text.toLowerCase();
   const queryLower = query.toLowerCase();
-
+  
   // Simple substring matching for highlighting
-  let lastIndex = 0;
+  let result = text;
   let index = textLower.indexOf(queryLower);
-
-  while (index !== -1) {
-    if (index > lastIndex) {
-      parts.push({ text: text.slice(lastIndex, index), match: false });
-    }
-    parts.push({ text: text.slice(index, index + query.length), match: true });
-    lastIndex = index + query.length;
-    index = textLower.indexOf(queryLower, lastIndex);
+  
+  if (index !== -1) {
+    const before = text.slice(0, index);
+    const match = text.slice(index, index + query.length);
+    const after = text.slice(index + query.length);
+    return `${before}<mark class="${highlightClass}">${match}</mark>${after}`;
   }
-
-  if (lastIndex < text.length) {
-    parts.push({ text: text.slice(lastIndex), match: false });
-  }
-
-  // If no matches found, try fuzzy matching
-  if (parts.length === 1 && !parts[0].match) {
-    let queryIndex = 0;
-    lastIndex = 0;
-
-    for (let i = 0; i < textLower.length && queryIndex < queryLower.length; i++) {
-      if (textLower[i] === queryLower[queryIndex]) {
-        if (i > lastIndex) {
-          parts.push({ text: text.slice(lastIndex, i), match: false });
-        }
-        parts.push({ text: text[i], match: true });
-        lastIndex = i + 1;
-        queryIndex++;
-      }
-    }
-
-    if (lastIndex < text.length) {
-      parts.push({ text: text.slice(lastIndex), match: false });
-    }
-
-    // Remove the initial non-match part
-    return (
-      <>
-        {parts.slice(1).map((part, i) => (
-          <span
-            key={i}
-            className={part.match ? highlightClass : undefined}
-          >
-            {part.text}
-          </span>
-        ))}
-      </>
-    );
-  }
-
-  return (
-    <>
-      {parts.map((part, i) => (
-        <span
-          key={i}
-          className={part.match ? highlightClass : undefined}
-        >
-          {part.text}
-        </span>
-      ))}
-    </>
-  );
+  
+  return text;
 }

@@ -411,5 +411,5 @@ export function migrateStorage(): void {
 
 // Export type and utilities
 export type { StorageEventHandler };
-export { isStorageAvailable, setupStorageListener, cleanupStorage, migrateStorage };
+export { isStorageAvailable, setupStorageListener, cleanupStorage };
 export default secureStorage;
