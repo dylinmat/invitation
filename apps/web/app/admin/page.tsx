@@ -98,7 +98,7 @@ const mockActivities: ActivityItem[] = [
   {
     id: "3",
     type: "org",
-    description: "New organization created: "Tech Startups Inc"",
+    description: "New organization created: 'Tech Startups Inc'",
     timestamp: "2024-01-15T09:20:00Z",
     actor: { name: "Jane Doe", email: "jane@techstartups.com" },
   },
