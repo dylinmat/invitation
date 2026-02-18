@@ -30,6 +30,7 @@ export * from "./skeleton";
 export * from "./stat-trend";
 export * from "./switch";
 export * from "./table";
+export * from "./textarea";
 export * from "./tabs";
 export * from "./timeline";
 export * from "./toast";
