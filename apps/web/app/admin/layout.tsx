@@ -65,42 +65,125 @@ function AccessDenied() {
   );
 }
 
+// Admin Login Component
+function AdminLogin({ onLogin }: { onLogin: (password: string) => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onLogin(password);
+    if (password !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+      setError(true);
+      setTimeout(() => setError(false), 2000);
+    }
+  };
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor: "#FDF8F5" }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md"
+      >
+        <div className="bg-card rounded-xl shadow-lg border p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Admin Access</h1>
+            <p className="text-muted-foreground">
+              Enter the admin password to continue
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Admin password"
+                className={`w-full px-4 py-3 rounded-lg border bg-background ${
+                  error ? "border-red-500 ring-1 ring-red-500" : "border-input"
+                }`}
+              />
+              {error && (
+                <p className="text-red-500 text-sm mt-2">Incorrect password</p>
+              )}
+            </div>
+            <Button type="submit" className="w-full">
+              Access Admin Panel
+            </Button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t text-center">
+            <Button variant="ghost" size="sm" asChild>
+              <a href="/dashboard">← Back to Dashboard</a>
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // Check if user has admin access
-// This is a simplified check - in production, this should verify against your auth system
 function useAdminCheck() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // In a real implementation, this would check the user's session/role
-    // For now, we'll simulate an admin check
     const checkAdmin = async () => {
       try {
-        // TODO: Replace with actual admin check from your auth system
-        // const user = await getCurrentUser();
-        // setIsAdmin(user?.role === 'platform_admin' || user?.isSuperAdmin);
-        
-        // Simulating admin access for development
-        // In production, this should be: setIsAdmin(false) by default
-        setIsAdmin(true);
+        // Check if already authenticated in this session
+        const adminSession = sessionStorage.getItem("admin_session");
+        if (adminSession === "true") {
+          setIsAdmin(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Otherwise show login
+        setShowLogin(true);
+        setIsLoading(false);
       } catch (error) {
         console.error("Admin check failed:", error);
-        toast({
-          title: "Authentication Error",
-          description: "Failed to verify admin access. Please try again.",
-          variant: "destructive",
-        });
         setIsAdmin(false);
-      } finally {
         setIsLoading(false);
       }
     };
 
     checkAdmin();
-  }, [toast]);
+  }, []);
 
-  return { isAdmin, isLoading };
+  const handleLogin = (password: string) => {
+    // Get admin password from env or use default for demo
+    const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "eios-admin-2024";
+    
+    if (password === adminPassword) {
+      sessionStorage.setItem("admin_session", "true");
+      setIsAdmin(true);
+      setShowLogin(false);
+      toast({
+        title: "Welcome Admin",
+        description: "You have successfully accessed the admin panel.",
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("admin_session");
+    setIsAdmin(false);
+    setShowLogin(true);
+  };
+
+  return { isAdmin, isLoading, showLogin, handleLogin, handleLogout };
 }
 
 export default function AdminLayout({
@@ -108,7 +191,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAdmin, isLoading } = useAdminCheck();
+  const { isAdmin, isLoading, showLogin, handleLogin } = useAdminCheck();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -139,6 +222,11 @@ export default function AdminLayout({
         </div>
       </div>
     );
+  }
+
+  // Show login screen
+  if (showLogin) {
+    return <AdminLogin onLogin={handleLogin} />;
   }
 
   // Access denied
