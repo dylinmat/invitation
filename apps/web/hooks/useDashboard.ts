@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { projectsApi, Project, ApiError } from "@/lib/api";
+import { projectsApi, Project, ApiError, api } from "@/lib/api";
 
 // ==================== Types ====================
 
@@ -345,52 +345,15 @@ export function useActivityFeed(limit = 10) {
   return useQuery<ActivityItem[], ApiError>({
     queryKey: ["dashboard", "activity", limit],
     queryFn: async () => {
-      // Mock activity data - in real app, fetch from API
-      const activities: ActivityItem[] = [
-        {
-          id: "1",
-          type: "rsvp",
-          message: "John & Sarah confirmed attendance",
-          projectName: "Johnson Wedding",
-          timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-        },
-        {
-          id: "2",
-          type: "invite_sent",
-          message: "45 invitations sent",
-          projectName: "Corporate Gala 2024",
-          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        },
-        {
-          id: "3",
-          type: "project_created",
-          message: "New project created",
-          projectName: "Birthday Bash",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-        },
-        {
-          id: "4",
-          type: "guest_added",
-          message: "12 guests added to list",
-          projectName: "Johnson Wedding",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-        },
-        {
-          id: "5",
-          type: "rsvp",
-          message: "Mike & Emma declined",
-          projectName: "Summer Party",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-        },
-        {
-          id: "6",
-          type: "guest_updated",
-          message: "Dietary preferences updated",
-          projectName: "Corporate Gala 2024",
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        },
-      ];
-      return activities.slice(0, limit);
+      try {
+        // Try to fetch from real API
+        const { activities } = await api.get<{ activities: ActivityItem[] }>("/activities", { limit });
+        return activities;
+      } catch {
+        // Fallback to empty array if API not available
+        // In production, this should be removed once API is implemented
+        return [];
+      }
     },
     staleTime: 30 * 1000,
   });
@@ -402,8 +365,14 @@ export function useSparklineData(projectId: string) {
   return useQuery<number[], ApiError>({
     queryKey: ["projects", projectId, "sparkline"],
     queryFn: async () => {
-      // Mock sparkline data - in real app, fetch from API
-      return Array.from({ length: 7 }, () => Math.floor(Math.random() * 50) + 10);
+      try {
+        // Try to fetch real sparkline data from API
+        const data = await api.get<{ values: number[] }>(`/projects/${projectId}/analytics/sparkline`);
+        return data.values;
+      } catch {
+        // Return empty array as fallback
+        return [];
+      }
     },
     staleTime: 5 * 60 * 1000,
   });

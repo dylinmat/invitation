@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
@@ -14,9 +14,12 @@ import {
   ChevronRight,
   Check,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { userApi, UserOrganization } from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,14 +38,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
-// Mock organizations
-const mockOrganizations = [
-  { id: "1", name: "Personal", role: "Owner" },
-  { id: "2", name: "Acme Corp", role: "Admin" },
-  { id: "3", name: "Design Studio", role: "Member" },
-];
-
-// Mock keyboard shortcuts
+// Keyboard shortcuts
 const keyboardShortcuts = [
   { key: "⌘ K", description: "Open command palette" },
   { key: "⌘ /", description: "Open global search" },
@@ -59,13 +55,53 @@ interface UserMenuProps {
 
 export function UserMenu({ className }: UserMenuProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const { user, logout } = useAuth();
-  const [currentOrg, setCurrentOrg] = useState(mockOrganizations[0]);
+  const [organizations, setOrganizations] = useState<UserOrganization[]>([]);
+  const [currentOrg, setCurrentOrg] = useState<UserOrganization | null>(null);
+  const [loadingOrgs, setLoadingOrgs] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // Load user's organizations
+  useEffect(() => {
+    const loadOrganizations = async () => {
+      try {
+        setLoadingOrgs(true);
+        const orgs = await userApi.getUserOrganizations();
+        setOrganizations(orgs);
+        // Set first org as current if none selected
+        if (orgs.length > 0 && !currentOrg) {
+          setCurrentOrg(orgs[0]);
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load organizations",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingOrgs(false);
+      }
+    };
+
+    loadOrganizations();
+  }, [toast, currentOrg]);
+
   const handleLogout = () => {
     logout();
+  };
+
+  const handleOrgChange = (orgId: string) => {
+    const org = organizations.find((o) => o.id === orgId);
+    if (org) {
+      setCurrentOrg(org);
+      // Optionally refresh the page or update context
+      toast({
+        title: "Organization Switched",
+        description: `Now viewing ${org.name}`,
+      });
+    }
   };
 
   const getInitials = (name: string) => {
@@ -134,35 +170,49 @@ export function UserMenu({ className }: UserMenuProps) {
             </DropdownMenuLabel>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="cursor-pointer">
-                <Building2 className="mr-2 h-4 w-4" />
-                <span className="flex-1">{currentOrg.name}</span>
+                {loadingOrgs ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Building2 className="mr-2 h-4 w-4" />
+                )}
+                <span className="flex-1">
+                  {currentOrg?.name || "No Organization"}
+                </span>
                 <span className="text-xs text-muted-foreground capitalize">
-                  {currentOrg.role}
+                  {currentOrg?.role || ""}
                 </span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-56">
-                <DropdownMenuRadioGroup
-                  value={currentOrg.id}
-                  onValueChange={(id) => {
-                    const org = mockOrganizations.find((o) => o.id === id);
-                    if (org) setCurrentOrg(org);
-                  }}
-                >
-                  {mockOrganizations.map((org) => (
-                    <DropdownMenuRadioItem
-                      key={org.id}
-                      value={org.id}
-                      className="cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>{org.name}</span>
-                        {org.id === currentOrg.id && (
-                          <Check className="w-4 h-4 ml-2" />
-                        )}
-                      </div>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
+                {loadingOrgs ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                    Loading...
+                  </div>
+                ) : organizations.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No organizations
+                  </div>
+                ) : (
+                  <DropdownMenuRadioGroup
+                    value={currentOrg?.id}
+                    onValueChange={handleOrgChange}
+                  >
+                    {organizations.map((org) => (
+                      <DropdownMenuRadioItem
+                        key={org.id}
+                        value={org.id}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span>{org.name}</span>
+                          {org.id === currentOrg?.id && (
+                            <Check className="w-4 h-4 ml-2" />
+                          )}
+                        </div>
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => router.push("/dashboard/organizations/new")}

@@ -6,9 +6,10 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { Shield, AlertTriangle, UserX } from "lucide-react";
+import { Shield, AlertTriangle, UserX, Lock, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/useToast";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 // Admin-specific error fallback
 function AdminErrorFallback() {
@@ -65,18 +66,49 @@ function AccessDenied() {
   );
 }
 
+// Admin Not Configured Component
+function AdminNotConfigured() {
+  const router = useRouter();
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor: "#FDF8F5" }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center max-w-md"
+      >
+        <div className="w-16 h-16 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-amber-600" />
+        </div>
+        <h2 className="text-xl font-semibold mb-2">Admin Access Not Configured</h2>
+        <p className="text-muted-foreground mb-6">
+          The admin panel is not properly configured. Please contact your system administrator to set up admin access.
+        </p>
+        <Button onClick={() => router.push("/dashboard")}>
+          Go to Dashboard
+        </Button>
+      </motion.div>
+    </div>
+  );
+}
+
 // Admin Login Component
-function AdminLogin({ onLogin }: { onLogin: (password: string) => void }) {
+function AdminLogin({ onLogin, error }: { onLogin: (password: string) => void; error?: string }) {
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState(error);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(password);
-    if (password !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
-      setError(true);
-      setTimeout(() => setError(false), 2000);
+    if (!password.trim()) {
+      setLocalError("Please enter the admin password");
+      return;
     }
+    setLocalError(undefined);
+    onLogin(password);
   };
 
   return (
@@ -102,17 +134,33 @@ function AdminLogin({ onLogin }: { onLogin: (password: string) => void }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Admin password"
-                className={`w-full px-4 py-3 rounded-lg border bg-background ${
-                  error ? "border-red-500 ring-1 ring-red-500" : "border-input"
-                }`}
-              />
-              {error && (
-                <p className="text-red-500 text-sm mt-2">Incorrect password</p>
+              <label className="block text-sm font-medium mb-2">
+                Admin Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setLocalError(undefined);
+                  }}
+                  placeholder="Enter admin password"
+                  className={`w-full px-4 py-3 pr-12 rounded-lg border bg-background transition-colors ${
+                    localError ? "border-red-500 ring-1 ring-red-500" : "border-input focus:ring-2 focus:ring-primary"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              {localError && (
+                <p className="text-red-500 text-sm mt-2">{localError}</p>
               )}
             </div>
             <Button type="submit" className="w-full">
@@ -136,11 +184,27 @@ function useAdminCheck() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
+  const [loginError, setLoginError] = useState<string>();
+  const [isConfigured, setIsConfigured] = useState(true);
   const { toast } = useToast();
+
+  // Get admin password from env
+  const getAdminPassword = () => {
+    const password = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+    return password;
+  };
 
   useEffect(() => {
     const checkAdmin = async () => {
       try {
+        // Check if admin password is configured
+        const adminPassword = getAdminPassword();
+        if (!adminPassword) {
+          setIsConfigured(false);
+          setIsLoading(false);
+          return;
+        }
+
         // Check if already authenticated in this session
         const adminSession = sessionStorage.getItem("admin_session");
         if (adminSession === "true") {
@@ -163,17 +227,24 @@ function useAdminCheck() {
   }, []);
 
   const handleLogin = (password: string) => {
-    // Get admin password from env or use default for demo
-    const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "eios-admin-2024";
+    const adminPassword = getAdminPassword();
+    
+    if (!adminPassword) {
+      setIsConfigured(false);
+      return;
+    }
     
     if (password === adminPassword) {
       sessionStorage.setItem("admin_session", "true");
       setIsAdmin(true);
       setShowLogin(false);
+      setLoginError(undefined);
       toast({
         title: "Welcome Admin",
         description: "You have successfully accessed the admin panel.",
       });
+    } else {
+      setLoginError("Incorrect password. Please try again.");
     }
   };
 
@@ -181,9 +252,13 @@ function useAdminCheck() {
     sessionStorage.removeItem("admin_session");
     setIsAdmin(false);
     setShowLogin(true);
+    toast({
+      title: "Logged out",
+      description: "You have been logged out of the admin panel.",
+    });
   };
 
-  return { isAdmin, isLoading, showLogin, handleLogin, handleLogout };
+  return { isAdmin, isLoading, showLogin, isConfigured, loginError, handleLogin, handleLogout };
 }
 
 export default function AdminLayout({
@@ -191,7 +266,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAdmin, isLoading, showLogin, handleLogin } = useAdminCheck();
+  const { isAdmin, isLoading, showLogin, isConfigured, loginError, handleLogin } = useAdminCheck();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -224,9 +299,14 @@ export default function AdminLayout({
     );
   }
 
+  // Admin not configured
+  if (!isConfigured) {
+    return <AdminNotConfigured />;
+  }
+
   // Show login screen
   if (showLogin) {
-    return <AdminLogin onLogin={handleLogin} />;
+    return <AdminLogin onLogin={handleLogin} error={loginError} />;
   }
 
   // Access denied
@@ -259,7 +339,10 @@ export default function AdminLayout({
           <AdminNav />
         </aside>
         <main className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6 lg:p-8 max-w-7xl">
+          <div className="container mx-auto p-6 lg:p-8 max-w-7xl space-y-6">
+            {/* Breadcrumbs */}
+            <Breadcrumbs />
+            
             <ErrorBoundary
               fallback={<AdminErrorFallback />}
               onError={(error, errorInfo, errorId) => {

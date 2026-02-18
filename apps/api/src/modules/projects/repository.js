@@ -198,7 +198,23 @@ const getProjectStats = async (projectId) => {
        (select count(*) from guest_groups where project_id = $1) as group_count,
        (select count(*) from invites where project_id = $1) as invite_count,
        (select count(*) from sites where project_id = $1) as site_count,
-       (select count(*) from events where project_id = $1) as event_count`,
+       (select count(*) from events where project_id = $1) as event_count,
+       (select count(distinct rs.id) 
+        from rsvp_submissions rs
+        join invites i on rs.invite_id = i.id
+        where i.project_id = $1 
+        and rs.status = 'accepted') as rsvp_yes_count,
+       (select count(distinct rs.id) 
+        from rsvp_submissions rs
+        join invites i on rs.invite_id = i.id
+        where i.project_id = $1 
+        and rs.status = 'declined') as rsvp_no_count,
+       (select count(*) 
+        from invites i
+        where i.project_id = $1 
+        and not exists (
+          select 1 from rsvp_submissions rs where rs.invite_id = i.id
+        )) as rsvp_pending_count`,
     [projectId]
   );
   return result.rows[0] || {
@@ -206,7 +222,10 @@ const getProjectStats = async (projectId) => {
     group_count: 0,
     invite_count: 0,
     site_count: 0,
-    event_count: 0
+    event_count: 0,
+    rsvp_yes_count: 0,
+    rsvp_no_count: 0,
+    rsvp_pending_count: 0
   };
 };
 

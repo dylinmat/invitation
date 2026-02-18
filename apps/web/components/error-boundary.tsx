@@ -23,9 +23,26 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[ErrorBoundary]", error, info);
+    // Log to console for debugging
+    console.error("[ErrorBoundary] Caught error:", {
+      error: error.message,
+      stack: error.stack,
+      componentStack: info.componentStack,
+      timestamp: new Date().toISOString(),
+      url: typeof window !== "undefined" ? window.location.href : "",
+      userAgent: typeof window !== "undefined" ? navigator.userAgent : "",
+    });
+    
+    // Call optional error handler
     this.props.onError?.(error, info);
-    // TODO: Send to error tracking service (Sentry, etc.)
+    
+    // Future: Send to error tracking service (Sentry, LogRocket, etc.)
+    // Example Sentry integration:
+    // if (typeof window !== "undefined" && window.Sentry) {
+    //   window.Sentry.captureException(error, {
+    //     extra: { componentStack: info.componentStack },
+    //   });
+    // }
   }
 
   handleRetry = () => {

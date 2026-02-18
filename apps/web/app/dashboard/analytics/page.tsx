@@ -56,6 +56,8 @@ import {
   generateMockHeatmapData,
   calculateChange,
 } from "@/lib/analytics";
+import { analyticsApi, projectsApi } from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
 
 // ============================================================================
 // Date Range Selector Component
@@ -371,8 +373,13 @@ export default function AnalyticsPage() {
   // Loading state
   const [isLoading, setIsLoading] = useState(true);
 
+  // Error state
+  const [error, setError] = useState<string | null>(null);
+
   // Refresh trigger
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  const { toast } = useToast();
 
   // Data state
   const [rsvpData, setRsvpData] = useState<Parameters<typeof transformRSVPTrends>[0]>([]);
@@ -397,75 +404,126 @@ export default function AnalyticsPage() {
     openRate: 0,
   });
 
-  // Load data
+  // Load data from API with mock fallback
   useEffect(() => {
-    setIsLoading(true);
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
 
-    // Simulate API call
-    const timer = setTimeout(() => {
-      // Generate mock data
-      const mockRsvpData = generateMockRSVPData(dateRange);
-      setRsvpData(mockRsvpData);
+      try {
+        // Try to fetch real data from API
+        // Note: These endpoints may not be fully implemented yet, so we use try/catch
+        let realDataAvailable = false;
 
-      // Generate compare data if enabled
-      if (isCompareEnabled) {
-        const previousRange = getPreviousPeriod(dateRange);
-        const mockCompareData = generateMockRSVPData(previousRange);
-        setCompareRsvpData(mockCompareData);
-      }
+        try {
+          // Get user's projects for analytics
+          const projectsResponse = await projectsApi.list({ limit: 100 });
+          const projectIds = projectsResponse.projects.map(p => p.id);
 
-      // Guest demographics
-      setGuestDemographics(transformGuestDemographics(generateMockGuestDemographics()));
+          if (projectIds.length > 0) {
+            // Fetch analytics for the first project (in real app, aggregate across all projects)
+            const summary = await analyticsApi.getSummary(projectIds[0]);
+            const timeSeries = await analyticsApi.getTimeSeries(projectIds[0], {
+              from: dateRange.from.toISOString(),
+              to: dateRange.to.toISOString(),
+            });
 
-      // Event performance
-      setEventPerformance(transformEventPerformance(generateMockEventPerformance()));
+            // Transform real data
+            setRsvpData(timeSeries.map((item: { date: string; views: number; rsvps: number }) => ({
+              date: new Date(item.date),
+              status: "accepted", // Simplified - real implementation would have full status breakdown
+              guestType: "all",
+            })));
 
-      // Funnel data
-      setFunnelData(transformInvitationFunnel(generateMockFunnelData()));
+            setCurrentSummary({
+              totalInvitations: summary.totalViews,
+              totalRSVPs: summary.totalRsvps,
+              acceptanceRate: Math.round(summary.rsvpRate * 100),
+              openRate: Math.round((summary.uniqueVisitors / Math.max(summary.totalViews, 1)) * 100),
+            });
 
-      // Heatmap data
-      setHeatmapData(transformEngagementHeatmap(generateMockHeatmapData(dateRange), dateRange));
-
-      // Real-time stats
-      setRealTimeStats(
-        generateRealTimeStats(
-          {
-            activeUsers: 142,
-            pageViews: 1234,
-            invitationsSent: 567,
-            rsvps: 89,
-            conversionRate: 15.7,
-          },
-          {
-            activeUsers: 128,
-            pageViews: 1156,
-            invitationsSent: 498,
-            rsvps: 76,
-            conversionRate: 15.3,
+            realDataAvailable = true;
           }
-        )
-      );
+        } catch (apiError) {
+          // API not available, fall back to mock data
+          console.log("Analytics API not available, using mock data");
+        }
 
-      // Summary data
-      setCurrentSummary({
-        totalInvitations: 1567,
-        totalRSVPs: 423,
-        acceptanceRate: 78.5,
-        openRate: 64.2,
-      });
+        // If real data not available, use mock data
+        if (!realDataAvailable) {
+          // Generate mock data
+          const mockRsvpData = generateMockRSVPData(dateRange);
+          setRsvpData(mockRsvpData);
 
-      setPreviousSummary({
-        totalInvitations: 1423,
-        totalRSVPs: 389,
-        acceptanceRate: 75.2,
-        openRate: 61.8,
-      });
+          // Summary data
+          setCurrentSummary({
+            totalInvitations: 1567,
+            totalRSVPs: 423,
+            acceptanceRate: 78.5,
+            openRate: 64.2,
+          });
 
-      setIsLoading(false);
-    }, 800);
+          setPreviousSummary({
+            totalInvitations: 1423,
+            totalRSVPs: 389,
+            acceptanceRate: 75.2,
+            openRate: 61.8,
+          });
+        }
 
-    return () => clearTimeout(timer);
-  }, [dateRange, datePreset, isCompareEnabled, refreshKey]);
+        // Generate compare data if enabled
+        if (isCompareEnabled) {
+          const previousRange = getPreviousPeriod(dateRange);
+          const mockCompareData = generateMockRSVPData(previousRange);
+          setCompareRsvpData(mockCompareData);
+        }
+
+        // Guest demographics (mock for now)
+        setGuestDemographics(transformGuestDemographics(generateMockGuestDemographics()));
+
+        // Event performance (mock for now)
+        setEventPerformance(transformEventPerformance(generateMockEventPerformance()));
+
+        // Funnel data (mock for now)
+        setFunnelData(transformInvitationFunnel(generateMockFunnelData()));
+
+        // Heatmap data (mock for now)
+        setHeatmapData(transformEngagementHeatmap(generateMockHeatmapData(dateRange), dateRange));
+
+        // Real-time stats (mock for now)
+        setRealTimeStats(
+          generateRealTimeStats(
+            {
+              activeUsers: 142,
+              pageViews: 1234,
+              invitationsSent: 567,
+              rsvps: 89,
+              conversionRate: 15.7,
+            },
+            {
+              activeUsers: 128,
+              pageViews: 1156,
+              invitationsSent: 498,
+              rsvps: 76,
+              conversionRate: 15.3,
+            }
+          )
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load analytics data";
+        setError(message);
+        toast({
+          title: "Error loading analytics",
+          description: message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [dateRange, datePreset, isCompareEnabled, refreshKey, toast]);
 
   // Handle date range change
   const handleDateRangeChange = useCallback((range: DateRangeValue, preset: DateRange) => {

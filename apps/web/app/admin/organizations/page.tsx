@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/page-header";
 import { Section } from "@/components/layout/section";
@@ -13,108 +13,20 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/useToast";
+import { useAdminOrganizations, useArchiveOrganization, useDeleteOrganization } from "@/hooks/useAdmin";
+import type { AdminOrganization } from "@/lib/admin-api";
 import {
   Building2,
   Plus,
   Users,
   Calendar,
-  CreditCard,
-  Settings,
   UserCog,
-  Mail,
-  Activity,
-  TrendingUp,
   Archive,
   Trash2,
+  Search,
 } from "lucide-react";
-
-// Types
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  plan: "free" | "pro" | "enterprise";
-  status: "active" | "suspended" | "archived";
-  memberCount: number;
-  projectCount: number;
-  owner: {
-    name: string;
-    email: string;
-  };
-  createdAt: string;
-  lastActiveAt: string;
-  monthlyRevenue: number;
-}
-
-// Mock data
-const mockOrganizations: Organization[] = [
-  {
-    id: "1",
-    name: "Acme Corporation",
-    slug: "acme-corp",
-    plan: "enterprise",
-    status: "active",
-    memberCount: 45,
-    projectCount: 12,
-    owner: { name: "John Smith", email: "john@acme.com" },
-    createdAt: "2023-01-15T08:00:00Z",
-    lastActiveAt: "2024-01-15T10:30:00Z",
-    monthlyRevenue: 999,
-  },
-  {
-    id: "2",
-    name: "TechStart Inc",
-    slug: "techstart",
-    plan: "pro",
-    status: "active",
-    memberCount: 12,
-    projectCount: 5,
-    owner: { name: "Sarah Johnson", email: "sarah@techstart.io" },
-    createdAt: "2023-03-20T14:30:00Z",
-    lastActiveAt: "2024-01-14T16:45:00Z",
-    monthlyRevenue: 199,
-  },
-  {
-    id: "3",
-    name: "Design Studio Co",
-    slug: "design-studio",
-    plan: "free",
-    status: "active",
-    memberCount: 3,
-    projectCount: 8,
-    owner: { name: "Mike Chen", email: "mike@design.co" },
-    createdAt: "2023-06-10T11:15:00Z",
-    lastActiveAt: "2024-01-10T09:20:00Z",
-    monthlyRevenue: 0,
-  },
-  {
-    id: "4",
-    name: "Global Events Ltd",
-    slug: "global-events",
-    plan: "enterprise",
-    status: "suspended",
-    memberCount: 28,
-    projectCount: 15,
-    owner: { name: "Emma Wilson", email: "emma@globalevents.com" },
-    createdAt: "2022-11-05T09:00:00Z",
-    lastActiveAt: "2023-12-20T14:00:00Z",
-    monthlyRevenue: 999,
-  },
-  {
-    id: "5",
-    name: "Small Biz LLC",
-    slug: "small-biz",
-    plan: "pro",
-    status: "archived",
-    memberCount: 2,
-    projectCount: 1,
-    owner: { name: "Alex Brown", email: "alex@smallbiz.com" },
-    createdAt: "2023-08-15T16:45:00Z",
-    lastActiveAt: "2023-10-30T10:00:00Z",
-    monthlyRevenue: 0,
-  },
-];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -127,72 +39,122 @@ const itemVariants = {
 };
 
 export default function OrganizationsPage() {
-  const [loading, setLoading] = useState(true);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Organization[]>([]);
   const { toast } = useToast();
+  const [selectedOrg, setSelectedOrg] = useState<AdminOrganization | null>(null);
+  const [selectedRows, setSelectedRows] = useState<AdminOrganization[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
-  useEffect(() => {
-    setTimeout(() => {
-      setOrganizations(mockOrganizations);
-      setLoading(false);
-    }, 800);
-  }, []);
+  // Fetch organizations from API
+  const { data: orgsData, isLoading, refetch } = useAdminOrganizations({
+    page,
+    limit: pageSize,
+    search: searchQuery,
+  });
 
-  const handleArchive = (org: Organization) => {
-    toast({
-      title: "Organization Archived",
-      description: `${org.name} has been archived.`,
-    });
+  const organizations = orgsData?.organizations || [];
+  const totalOrganizations = orgsData?.total || 0;
+
+  // Mutations
+  const archiveOrgMutation = useArchiveOrganization();
+  const deleteOrgMutation = useDeleteOrganization();
+
+  const handleArchive = async (org: AdminOrganization) => {
+    try {
+      await archiveOrgMutation.mutateAsync(org.id);
+      toast({
+        title: "Organization Archived",
+        description: `${org.name} has been archived.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to archive organization. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleTransfer = (org: Organization) => {
+  const handleTransfer = (org: AdminOrganization) => {
     toast({
       title: "Transfer Ownership",
       description: `Initiated ownership transfer for ${org.name}.`,
     });
   };
 
-  const handleDelete = (org: Organization) => {
-    toast({
-      title: "Organization Deleted",
-      description: `${org.name} has been permanently deleted.`,
-      variant: "destructive",
-    });
+  const handleDelete = async (org: AdminOrganization) => {
+    if (!confirm(`Are you sure you want to delete ${org.name}? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteOrgMutation.mutateAsync(org.id);
+      toast({
+        title: "Organization Deleted",
+        description: `${org.name} has been permanently deleted.`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete organization. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleBulkArchive = () => {
-    toast({
-      title: "Organizations Archived",
-      description: `${selectedRows.length} organizations archived.`,
-    });
-    setSelectedRows([]);
+  const handleBulkArchive = async () => {
+    try {
+      await Promise.all(selectedRows.map(org => archiveOrgMutation.mutateAsync(org.id)));
+      toast({
+        title: "Organizations Archived",
+        description: `${selectedRows.length} organizations archived.`,
+      });
+      setSelectedRows([]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to archive organizations. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleBulkDelete = () => {
-    toast({
-      title: "Organizations Deleted",
-      description: `${selectedRows.length} organizations deleted.`,
-      variant: "destructive",
-    });
-    setSelectedRows([]);
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedRows.length} organizations? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await Promise.all(selectedRows.map(org => deleteOrgMutation.mutateAsync(org.id)));
+      toast({
+        title: "Organizations Deleted",
+        description: `${selectedRows.length} organizations deleted.`,
+        variant: "destructive",
+      });
+      setSelectedRows([]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete organizations. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const getPlanBadge = (plan: Organization["plan"]) => {
+  const getPlanBadge = (plan: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       free: "secondary",
       pro: "default",
       enterprise: "destructive",
     };
     return (
-      <Badge variant={variants[plan]} className="capitalize">
+      <Badge variant={variants[plan] || "secondary"} className="capitalize">
         {plan}
       </Badge>
     );
   };
 
-  const columns: AdminColumn<Organization>[] = [
+  const columns: AdminColumn<AdminOrganization>[] = [
     {
       key: "name",
       header: "Organization",
@@ -205,6 +167,23 @@ export default function OrganizationsPage() {
       sortable: true,
       filterable: true,
       filterType: "text",
+    },
+    {
+      key: "type",
+      header: "Type",
+      accessor: (org) => (
+        <Badge variant="outline" className="uppercase text-xs">
+          {org.type}
+        </Badge>
+      ),
+      sortable: true,
+      filterable: true,
+      filterType: "select",
+      filterOptions: [
+        { label: "Couple", value: "COUPLE" },
+        { label: "Planner", value: "PLANNER" },
+        { label: "Venue", value: "VENUE" },
+      ],
     },
     {
       key: "plan",
@@ -252,23 +231,16 @@ export default function OrganizationsPage() {
       align: "center",
     },
     {
-      key: "monthlyRevenue",
-      header: "MRR",
-      accessor: (org) => `$${org.monthlyRevenue.toLocaleString()}`,
-      sortable: true,
-      align: "right",
-    },
-    {
       key: "owner",
       header: "Owner",
       accessor: (org) => (
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarFallback className="text-xs bg-primary/10 text-primary">
-              {org.owner.name.charAt(0)}
+              {org.owner.email.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <span className="text-sm">{org.owner.name}</span>
+          <span className="text-sm truncate max-w-[120px]">{org.owner.email}</span>
         </div>
       ),
       sortable: true,
@@ -278,8 +250,6 @@ export default function OrganizationsPage() {
       header: "Created",
       accessor: (org) => new Date(org.createdAt).toLocaleDateString(),
       sortable: true,
-      filterable: true,
-      filterType: "date",
     },
     {
       key: "actions",
@@ -319,22 +289,40 @@ export default function OrganizationsPage() {
         />
       </motion.div>
 
+      {/* Search Bar */}
+      <motion.div variants={itemVariants}>
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search organizations by name..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+      </motion.div>
+
       <motion.div variants={itemVariants}>
         <Card>
           <AdminDataTable
             data={organizations}
             columns={columns}
             keyExtractor={(org) => org.id}
-            loading={loading}
-            searchable
-            searchKeys={["name", "slug", "owner.name", "owner.email"]}
+            loading={isLoading}
+            searchable={false} // We have custom search above
             sortable
             pagination
-            pageSize={10}
+            pageSize={pageSize}
+            currentPage={page}
+            totalItems={totalOrganizations}
+            onPageChange={setPage}
             selectable
             onSelectionChange={setSelectedRows}
             onRowClick={(org) => setSelectedOrg(org)}
-            title={`All Organizations (${organizations.length})`}
+            title={`All Organizations (${totalOrganizations})`}
             exportFileName="organizations"
           />
         </Card>
@@ -381,10 +369,9 @@ export default function OrganizationsPage() {
               </DialogHeader>
 
               <Tabs defaultValue="overview" className="mt-4">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="members">Members</TabsTrigger>
-                  <TabsTrigger value="billing">Billing</TabsTrigger>
                   <TabsTrigger value="settings">Settings</TabsTrigger>
                 </TabsList>
 
@@ -419,19 +406,19 @@ export default function OrganizationsPage() {
                     <div className="text-sm space-y-2">
                       <div className="flex justify-between py-2 border-b">
                         <span className="text-muted-foreground">Organization ID</span>
-                        <span className="font-mono">{selectedOrg.id}</span>
+                        <span className="font-mono text-xs">{selectedOrg.id}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
                         <span className="text-muted-foreground">Created</span>
                         <span>{new Date(selectedOrg.createdAt).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Last Active</span>
-                        <span>{new Date(selectedOrg.lastActiveAt).toLocaleString()}</span>
+                        <span className="text-muted-foreground">Type</span>
+                        <Badge variant="outline" className="uppercase">{selectedOrg.type}</Badge>
                       </div>
                       <div className="flex justify-between py-2 border-b">
                         <span className="text-muted-foreground">Owner</span>
-                        <span>{selectedOrg.owner.name} ({selectedOrg.owner.email})</span>
+                        <span>{selectedOrg.owner.email}</span>
                       </div>
                     </div>
                   </div>
@@ -440,31 +427,14 @@ export default function OrganizationsPage() {
                 <TabsContent value="members" className="mt-4">
                   <div className="p-8 text-center text-muted-foreground">
                     <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>Manage organization members in the members tab.</p>
+                    <p>Organization members</p>
+                    <p className="text-sm mt-1">
+                      This organization has {selectedOrg.memberCount} member(s).
+                    </p>
                     <Button className="mt-4" variant="outline">
                       <Users className="mr-2 h-4 w-4" />
                       View All Members
                     </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="billing" className="mt-4">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Current Plan</p>
-                          <p className="text-lg font-semibold capitalize">{selectedOrg.plan}</p>
-                        </div>
-                        <Button variant="outline" size="sm">Change Plan</Button>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Monthly Recurring Revenue</p>
-                      <p className="text-2xl font-semibold">
-                        ${selectedOrg.monthlyRevenue.toLocaleString()}
-                      </p>
-                    </div>
                   </div>
                 </TabsContent>
 

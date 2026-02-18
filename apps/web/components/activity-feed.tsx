@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FolderPlus,
@@ -17,33 +17,12 @@ import { cn, formatRelativeTime, formatDate } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-// Types
-export type ActivityType =
-  | "project_created"
-  | "guest_added"
-  | "invite_sent"
-  | "rsvp_received"
-  | "site_published";
-
-export interface Activity {
-  id: string;
-  type: ActivityType;
-  actor: {
-    name: string;
-    avatar?: string;
-    initials?: string;
-  };
-  target: {
-    type: string;
-    name: string;
-    id: string;
-  };
-  metadata?: Record<string, unknown>;
-  createdAt: Date;
-}
+import { activityApi, ActivityFeedItem } from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
 
 // Activity type configurations
+export type ActivityType = ActivityFeedItem["type"];
+
 const activityConfig: Record<
   ActivityType,
   {
@@ -51,7 +30,7 @@ const activityConfig: Record<
     label: string;
     color: string;
     bgColor: string;
-    description: (activity: Activity) => string;
+    description: (activity: ActivityFeedItem) => string;
   }
 > = {
   project_created: {
@@ -98,65 +77,9 @@ const activityConfig: Record<
   },
 };
 
-// Mock data generator
-const generateMockActivities = (count: number, offset = 0): Activity[] => {
-  const types: ActivityType[] = [
-    "project_created",
-    "guest_added",
-    "invite_sent",
-    "rsvp_received",
-    "site_published",
-  ];
-  const actors = [
-    { name: "Sarah Johnson", initials: "SJ" },
-    { name: "Michael Chen", initials: "MC" },
-    { name: "Emily Davis", initials: "ED" },
-    { name: "James Wilson", initials: "JW" },
-    { name: "You", initials: "YO" },
-  ];
-  const projects = [
-    "Sarah's Wedding",
-    "Birthday Party 2024",
-    "Corporate Event",
-    "Baby Shower",
-    "Anniversary Dinner",
-    "Graduation Party",
-  ];
-
-  return Array.from({ length: count }, (_, i) => {
-    const type = types[Math.floor(Math.random() * types.length)];
-    const actor = actors[Math.floor(Math.random() * actors.length)];
-    const project = projects[Math.floor(Math.random() * projects.length)];
-    const daysAgo = Math.floor((i + offset) / 3) + Math.floor(Math.random() * 2);
-
-    return {
-      id: `activity-${offset + i}`,
-      type,
-      actor: {
-        name: actor.name,
-        initials: actor.initials,
-      },
-      target: {
-        type: "project",
-        name: project,
-        id: `project-${Math.floor(Math.random() * 100)}`,
-      },
-      metadata:
-        type === "guest_added"
-          ? { guestCount: Math.floor(Math.random() * 5) + 1 }
-          : type === "invite_sent"
-          ? { inviteCount: Math.floor(Math.random() * 10) + 1 }
-          : type === "rsvp_received"
-          ? { response: Math.random() > 0.3 ? "accepted" : "declined" }
-          : undefined,
-      createdAt: new Date(Date.now() - daysAgo * 86400000 - Math.random() * 86400000),
-    };
-  });
-};
-
 // Group activities by date
-function groupActivitiesByDate(activities: Activity[]): Record<string, Activity[]> {
-  const groups: Record<string, Activity[]> = {};
+function groupActivitiesByDate(activities: ActivityFeedItem[]): Record<string, ActivityFeedItem[]> {
+  const groups: Record<string, ActivityFeedItem[]> = {};
 
   activities.forEach((activity) => {
     const date = new Date(activity.createdAt);
@@ -191,19 +114,45 @@ export function ActivityFeed({
   showFilters = true,
   maxItems,
 }: ActivityFeedProps) {
-  const [activities, setActivities] = useState<Activity[]>(() =>
-    generateMockActivities(10)
-  );
+  const { toast } = useToast();
+  const [activities, setActivities] = useState<ActivityFeedItem[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<ActivityType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
+  // Initial load
+  useEffect(() => {
+    const loadActivities = async () => {
+      setIsLoading(true);
+      try {
+        const response = await activityApi.getActivities({
+          limit: maxItems || 10,
+          offset: 0,
+          types: selectedTypes.length > 0 ? selectedTypes : undefined,
+        });
+        setActivities(response.activities);
+        setHasMore(response.hasMore);
+        setOffset(response.activities.length);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load activities",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadActivities();
+  }, [maxItems, selectedTypes, toast]);
+
   // Filter activities
-  const filteredActivities = selectedTypes.length
-    ? activities.filter((a) => selectedTypes.includes(a.type))
-    : activities;
+  const filteredActivities = activities;
 
   const displayedActivities = maxItems
     ? filteredActivities.slice(0, maxItems)
@@ -212,21 +161,32 @@ export function ActivityFeed({
   const groupedActivities = groupActivitiesByDate(displayedActivities);
 
   // Infinite scroll
-  const loadMore = useCallback(() => {
-    if (isLoading || !hasMore) return;
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore || maxItems) return;
 
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const newActivities = generateMockActivities(10, activities.length);
-      setActivities((prev) => [...prev, ...newActivities]);
-      setIsLoading(false);
-      if (activities.length >= 50) setHasMore(false);
-    }, 800);
-  }, [activities.length, isLoading, hasMore]);
+    setIsLoadingMore(true);
+    try {
+      const response = await activityApi.getActivities({
+        limit: 10,
+        offset,
+        types: selectedTypes.length > 0 ? selectedTypes : undefined,
+      });
+      setActivities((prev) => [...prev, ...response.activities]);
+      setHasMore(response.hasMore);
+      setOffset((prev) => prev + response.activities.length);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load more activities",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, maxItems, offset, selectedTypes, toast]);
 
   // Intersection observer for infinite scroll
-  React.useEffect(() => {
+  useEffect(() => {
     if (maxItems) return;
 
     observerRef.current = new IntersectionObserver(
@@ -250,7 +210,19 @@ export function ActivityFeed({
     setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
+    // Reset offset when filters change
+    setOffset(0);
   };
+
+  if (isLoading && activities.length === 0) {
+    return (
+      <div className={cn("space-y-6", className)}>
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -354,7 +326,7 @@ export function ActivityFeed({
                                 </span>
                               </p>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                {formatRelativeTime(activity.createdAt)}
+                                {formatRelativeTime(new Date(activity.createdAt))}
                               </p>
                             </div>
 
@@ -403,7 +375,7 @@ export function ActivityFeed({
         {/* Load More Trigger */}
         {!maxItems && hasMore && (
           <div ref={loadMoreRef} className="flex justify-center py-4">
-            {isLoading && (
+            {isLoadingMore && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span className="text-sm">Loading more...</span>

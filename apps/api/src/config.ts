@@ -165,7 +165,10 @@ const CORS: CorsConfig = {
     if (!origin) {
       // Default origins based on environment
       if (isDev) return ["http://localhost:3000", "http://localhost:3001"];
-      return true; // Reflect origin in production if not specified
+      // SECURITY: In production, require explicit CORS_ORIGIN configuration
+      // Do NOT default to reflecting the origin (which would allow any origin)
+      console.warn("SECURITY WARNING: CORS_ORIGIN not set in production. CORS will deny all cross-origin requests.");
+      return []; // Empty array = deny all cross-origin requests
     }
     // Parse comma-separated origins
     return origin.split(",").map(o => o.trim());

@@ -37,11 +37,11 @@ const extractCookieToken = (cookies) => {
  */
 const authenticateHook = async (request, reply) => {
   try {
-    // Try to get token from Authorization header, cookies, or query string
+    // SECURITY: Only accept tokens from Authorization header or cookies
+    // Query string tokens are disabled to prevent token leakage in URLs/logs
     const token =
       extractBearerToken(request.headers) ||
-      extractCookieToken(request.cookies) ||
-      request.query?.token;
+      extractCookieToken(request.cookies);
 
     if (!token) {
       return reply.status(401).send({
@@ -84,10 +84,10 @@ const authenticateHook = async (request, reply) => {
  */
 const optionalAuthHook = async (request, reply) => {
   try {
+    // SECURITY: Only accept tokens from Authorization header or cookies
     const token =
       extractBearerToken(request.headers) ||
-      extractCookieToken(request.cookies) ||
-      request.query?.token;
+      extractCookieToken(request.cookies);
 
     if (token) {
       const validation = await validateSession(token);

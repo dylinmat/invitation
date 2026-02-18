@@ -77,6 +77,10 @@ export interface AdminDataTableProps<T> extends Omit<BaseDataTableProps<T>, "col
   refreshInterval?: number;
   exportFileName?: string;
   enableAdvancedFilters?: boolean;
+  // Server-side pagination props
+  currentPage?: number;
+  totalItems?: number;
+  onPageChange?: (page: number) => void;
 }
 
 // Advanced filter builder component
@@ -296,6 +300,10 @@ export function AdminDataTable<T>({
   exportFileName = "export",
   enableAdvancedFilters = true,
   toolbar,
+  // Server-side pagination props
+  currentPage,
+  totalItems,
+  onPageChange,
   ...props
 }: AdminDataTableProps<T>) {
   const [showFilters, setShowFilters] = React.useState(false);
@@ -503,7 +511,55 @@ export function AdminDataTable<T>({
         columns={columns}
         toolbar={null}
         onExport={undefined}
+        // Disable internal pagination if server-side pagination is used
+        pagination={!onPageChange}
       />
+      
+      {/* Server-side Pagination */}
+      {onPageChange && totalItems !== undefined && currentPage !== undefined && (
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * (props.pageSize || 10)) + 1} to {Math.min(currentPage * (props.pageSize || 10), totalItems)} of {totalItems} entries
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(1)}
+              disabled={currentPage === 1}
+            >
+              First
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm px-2">
+              Page {currentPage} of {Math.ceil(totalItems / (props.pageSize || 10))}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage >= Math.ceil(totalItems / (props.pageSize || 10))}
+            >
+              Next
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(Math.ceil(totalItems / (props.pageSize || 10)))}
+              disabled={currentPage >= Math.ceil(totalItems / (props.pageSize || 10))}
+            >
+              Last
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

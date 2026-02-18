@@ -218,16 +218,26 @@ async function messagingRoutes(fastify, opts) {
   }, async (request, reply) => {
     const { id } = request.params;
     const { reason } = request.body;
-    const adminId = request.user?.id || request.headers["x-admin-id"];
-
-    if (!adminId) {
+    
+    // SECURITY: Verify user is authenticated and has admin role
+    const user = request.user;
+    if (!user) {
       return reply.status(401).send({
         success: false,
-        error: "Admin authentication required"
+        error: "Authentication required"
+      });
+    }
+    
+    // Check admin role from user's session (not from header)
+    const userRole = request.orgRole || user.role;
+    if (userRole !== 'admin') {
+      return reply.status(403).send({
+        success: false,
+        error: "Admin access required"
       });
     }
 
-    const result = await approveCampaign(id, adminId, reason);
+    const result = await approveCampaign(id, user.id, reason);
 
     return {
       success: true,

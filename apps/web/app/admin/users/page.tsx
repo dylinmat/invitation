@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/page-header";
 import { Section } from "@/components/layout/section";
@@ -13,11 +13,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/useToast";
+import { useAdminUsers, useUpdateUserStatus, useDeleteUser } from "@/hooks/useAdmin";
+import type { AdminUser, AdminUserDetail } from "@/lib/admin-api";
 import {
   Users,
   Plus,
-  Search,
   UserCog,
   Ban,
   Trash2,
@@ -27,103 +29,9 @@ import {
   Shield,
   CheckCircle2,
   XCircle,
+  Search,
 } from "lucide-react";
 import { DateRange } from "react-day-picker";
-
-// Types
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-  role: "admin" | "user" | "super_admin";
-  status: "active" | "suspended" | "banned" | "unverified";
-  isVerified: boolean;
-  organizationCount: number;
-  lastActiveAt: string;
-  createdAt: string;
-  loginCount: number;
-}
-
-interface UserActivity {
-  id: string;
-  action: string;
-  timestamp: string;
-  ip?: string;
-  userAgent?: string;
-}
-
-// Mock data
-const mockUsers: User[] = [
-  {
-    id: "1",
-    email: "john@example.com",
-    name: "John Smith",
-    role: "user",
-    status: "active",
-    isVerified: true,
-    organizationCount: 3,
-    lastActiveAt: "2024-01-15T10:30:00Z",
-    createdAt: "2023-06-15T08:00:00Z",
-    loginCount: 156,
-  },
-  {
-    id: "2",
-    email: "sarah@company.com",
-    name: "Sarah Johnson",
-    role: "admin",
-    status: "active",
-    isVerified: true,
-    organizationCount: 1,
-    lastActiveAt: "2024-01-15T09:45:00Z",
-    createdAt: "2023-08-20T14:30:00Z",
-    loginCount: 89,
-  },
-  {
-    id: "3",
-    email: "mike@startup.io",
-    name: "Mike Chen",
-    role: "user",
-    status: "suspended",
-    isVerified: true,
-    organizationCount: 2,
-    lastActiveAt: "2024-01-10T16:20:00Z",
-    createdAt: "2023-09-05T11:15:00Z",
-    loginCount: 45,
-  },
-  {
-    id: "4",
-    email: "emma@design.co",
-    name: "Emma Wilson",
-    role: "user",
-    status: "unverified",
-    isVerified: false,
-    organizationCount: 0,
-    lastActiveAt: "",
-    createdAt: "2024-01-14T20:00:00Z",
-    loginCount: 0,
-  },
-  {
-    id: "5",
-    email: "alex@blocked.com",
-    name: "Alex Brown",
-    role: "user",
-    status: "banned",
-    isVerified: true,
-    organizationCount: 0,
-    lastActiveAt: "2023-12-01T10:00:00Z",
-    createdAt: "2023-07-10T09:30:00Z",
-    loginCount: 12,
-  },
-];
-
-const mockActivity: UserActivity[] = [
-  { id: "1", action: "Login", timestamp: "2024-01-15T10:30:00Z", ip: "192.168.1.1" },
-  { id: "2", action: "Project Created", timestamp: "2024-01-15T10:35:00Z" },
-  { id: "3", action: "Settings Updated", timestamp: "2024-01-14T16:20:00Z" },
-  { id: "4", action: "Login", timestamp: "2024-01-14T09:00:00Z", ip: "192.168.1.1" },
-  { id: "5", action: "Invitation Sent", timestamp: "2024-01-13T14:45:00Z" },
-];
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -136,80 +44,155 @@ const itemVariants = {
 };
 
 export default function UsersPage() {
-  const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedRows, setSelectedRows] = useState<User[]>([]);
-  const [filters, setFilters] = useState<FilterCondition<User>[]>([]);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const { toast } = useToast();
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [selectedRows, setSelectedRows] = useState<AdminUser[]>([]);
+  const [filters, setFilters] = useState<FilterCondition<AdminUser>[]>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setUsers(mockUsers);
-      setLoading(false);
-    }, 800);
-  }, []);
+  // Fetch users from API
+  const { data: usersData, isLoading, refetch } = useAdminUsers({
+    page,
+    limit: pageSize,
+    search: searchQuery,
+  });
 
-  const handleImpersonate = (user: User) => {
+  const users = usersData?.users || [];
+  const totalUsers = usersData?.total || 0;
+
+  // Mutations
+  const updateStatusMutation = useUpdateUserStatus();
+  const deleteUserMutation = useDeleteUser();
+
+  const handleImpersonate = (user: AdminUser) => {
     toast({
       title: "Impersonating User",
       description: `You are now viewing as ${user.name} (${user.email})`,
     });
   };
 
-  const handleSuspend = (user: User) => {
-    toast({
-      title: "User Suspended",
-      description: `${user.name} has been suspended.`,
-      variant: "default",
-    });
+  const handleSuspend = async (user: AdminUser) => {
+    try {
+      await updateStatusMutation.mutateAsync({ id: user.id, status: "suspended" });
+      toast({
+        title: "User Suspended",
+        description: `${user.name} has been suspended.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to suspend user. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleBan = (user: User) => {
-    toast({
-      title: "User Banned",
-      description: `${user.name} has been permanently banned.`,
-      variant: "destructive",
-    });
+  const handleBan = async (user: AdminUser) => {
+    try {
+      await updateStatusMutation.mutateAsync({ id: user.id, status: "banned" });
+      toast({
+        title: "User Banned",
+        description: `${user.name} has been permanently banned.`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to ban user. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDelete = (user: User) => {
-    toast({
-      title: "User Deleted",
-      description: `${user.name} and all their data have been deleted.`,
-      variant: "destructive",
-    });
+  const handleActivate = async (user: AdminUser) => {
+    try {
+      await updateStatusMutation.mutateAsync({ id: user.id, status: "active" });
+      toast({
+        title: "User Activated",
+        description: `${user.name} has been activated.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to activate user. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleBulkSuspend = () => {
-    toast({
-      title: "Users Suspended",
-      description: `${selectedRows.length} users have been suspended.`,
-    });
-    setSelectedRows([]);
+  const handleDelete = async (user: AdminUser) => {
+    if (!confirm(`Are you sure you want to delete ${user.name}? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteUserMutation.mutateAsync(user.id);
+      toast({
+        title: "User Deleted",
+        description: `${user.name} and all their data have been deleted.`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete user. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleBulkDelete = () => {
-    toast({
-      title: "Users Deleted",
-      description: `${selectedRows.length} users have been deleted.`,
-      variant: "destructive",
-    });
-    setSelectedRows([]);
+  const handleBulkSuspend = async () => {
+    try {
+      await Promise.all(selectedRows.map(user => 
+        updateStatusMutation.mutateAsync({ id: user.id, status: "suspended" })
+      ));
+      toast({
+        title: "Users Suspended",
+        description: `${selectedRows.length} users have been suspended.`,
+      });
+      setSelectedRows([]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to suspend users. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const columns: AdminColumn<User>[] = [
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedRows.length} users? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await Promise.all(selectedRows.map(user => deleteUserMutation.mutateAsync(user.id)));
+      toast({
+        title: "Users Deleted",
+        description: `${selectedRows.length} users have been deleted.`,
+        variant: "destructive",
+      });
+      setSelectedRows([]);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete users. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const columns: AdminColumn<AdminUser>[] = [
     {
       key: "name",
       header: "User",
       accessor: (user) => (
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatar} alt={user.name} />
+            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`} alt={user.name} />
             <AvatarFallback className="bg-primary/10 text-primary">
-              {user.name.charAt(0)}
+              {user.name?.charAt(0) || user.email.charAt(0)}
             </AvatarFallback>
           </Avatar>
           <div>
@@ -239,14 +222,13 @@ export default function UsersPage() {
         { label: "Active", value: "active" },
         { label: "Suspended", value: "suspended" },
         { label: "Banned", value: "banned" },
-        { label: "Unverified", value: "unverified" },
       ],
     },
     {
       key: "role",
       header: "Role",
       accessor: (user) => (
-        <Badge variant={user.role === "super_admin" ? "destructive" : "secondary"}>
+        <Badge variant={user.role === "super_admin" ? "destructive" : user.role === "admin" ? "default" : "secondary"}>
           {user.role}
         </Badge>
       ),
@@ -292,8 +274,9 @@ export default function UsersPage() {
             onView: () => setSelectedUser(user),
             onEdit: () => setSelectedUser(user),
             onImpersonate: () => handleImpersonate(user),
-            onSuspend: () => handleSuspend(user),
-            onBan: () => handleBan(user),
+            onSuspend: user.status === "active" ? () => handleSuspend(user) : undefined,
+            onBan: user.status !== "banned" ? () => handleBan(user) : undefined,
+            onActivate: user.status !== "active" ? () => handleActivate(user) : undefined,
             onDelete: () => handleDelete(user),
           })}
         />
@@ -322,18 +305,36 @@ export default function UsersPage() {
         />
       </motion.div>
 
+      {/* Search Bar */}
+      <motion.div variants={itemVariants}>
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search users by name or email..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+      </motion.div>
+
       <motion.div variants={itemVariants}>
         <Card>
           <AdminDataTable
             data={users}
             columns={columns}
             keyExtractor={(user) => user.id}
-            loading={loading}
-            searchable
-            searchKeys={["name", "email"]}
+            loading={isLoading}
+            searchable={false} // We have custom search above
             sortable
             pagination
-            pageSize={10}
+            pageSize={pageSize}
+            currentPage={page}
+            totalItems={totalUsers}
+            onPageChange={setPage}
             selectable
             onSelectionChange={setSelectedRows}
             onRowClick={(user) => setSelectedUser(user)}
@@ -341,7 +342,7 @@ export default function UsersPage() {
             onFiltersChange={setFilters}
             dateRange={dateRange}
             onDateRangeChange={setDateRange}
-            title={`All Users (${users.length})`}
+            title={`All Users (${totalUsers})`}
             exportFileName="users"
           />
         </Card>
@@ -378,7 +379,7 @@ export default function UsersPage() {
                 <DialogTitle className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-primary/10 text-primary">
-                      {selectedUser.name.charAt(0)}
+                      {selectedUser.name?.charAt(0) || selectedUser.email.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -422,9 +423,9 @@ export default function UsersPage() {
                       </p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Total Logins</p>
-                      <p className="text-2xl font-semibold mt-1">
-                        {selectedUser.loginCount}
+                      <p className="text-sm text-muted-foreground">Locale</p>
+                      <p className="text-lg font-semibold mt-1">
+                        {selectedUser.locale || "en"}
                       </p>
                     </div>
                   </div>
@@ -434,7 +435,7 @@ export default function UsersPage() {
                     <div className="text-sm space-y-2">
                       <div className="flex justify-between py-2 border-b">
                         <span className="text-muted-foreground">User ID</span>
-                        <span className="font-mono">{selectedUser.id}</span>
+                        <span className="font-mono text-xs">{selectedUser.id}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
                         <span className="text-muted-foreground">Joined</span>
@@ -477,25 +478,13 @@ export default function UsersPage() {
 
                 <TabsContent value="activity" className="mt-4">
                   <div className="space-y-4">
-                    {mockActivity.map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex items-start gap-3 p-3 rounded-lg border"
-                      >
-                        <Activity className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{activity.action}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(activity.timestamp).toLocaleString()}
-                          </p>
-                          {activity.ip && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              IP: {activity.ip}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                    <div className="p-8 text-center text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>Activity tracking coming soon</p>
+                      <p className="text-sm mt-1">
+                        Detailed user activity logs will be available in a future update.
+                      </p>
+                    </div>
                   </div>
                 </TabsContent>
 

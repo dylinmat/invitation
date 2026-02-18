@@ -1,4 +1,23 @@
 const crypto = require("crypto");
+
+/**
+ * Sanitize user input to prevent XSS
+ * @param {string} input - Raw user input
+ * @returns {string} - Sanitized output
+ */
+const sanitizeInput = (input) => {
+  if (!input || typeof input !== 'string') return input;
+  
+  // Basic HTML tag removal and entity encoding
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+};
+
 const {
   // Photo Wall Settings
   getPhotoWallSettings,
@@ -145,6 +164,8 @@ const processPhotoUpload = async (storageKey, {
   uploadedByIp,
   uploadedByUserAgent
 }) => {
+  // SECURITY: Sanitize caption to prevent XSS
+  const sanitizedCaption = sanitizeInput(caption);
   // Get settings
   const settings = await getProjectPhotoWallSettings(projectId);
   if (!settings) {
@@ -164,7 +185,7 @@ const processPhotoUpload = async (storageKey, {
     storageKey,
     fileSizeBytes,
     mimeType,
-    caption,
+    caption: sanitizedCaption,  // SECURITY: Use sanitized caption
     uploadedByIp,
     uploadedByUserAgent
   });

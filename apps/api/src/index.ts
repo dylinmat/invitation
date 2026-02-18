@@ -165,7 +165,7 @@ export async function registerHealthRoutes(fastify: FastifyInstance): Promise<vo
     return {
       status: "ok",
       service: "eios-api",
-      version: "1.0.0",
+      // SECURITY: Version information removed to prevent information disclosure
       timestamp: new Date().toISOString(),
     };
   });
@@ -223,7 +223,8 @@ export async function registerInfoRoute(fastify: FastifyInstance): Promise<void>
  */
 async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { registerUser, sendLoginMagicLink, loginWithMagicLink } = require("./modules/auth/service");
+    const { registerUser, sendLoginMagicLink, loginWithMagicLink, logout, getCurrentUser } = require("./modules/auth/service");
+    const { authenticateHook, otpVerifyRateLimiter } = require("./modules/auth/middleware");
     
     fastify.post("/auth/register", async (request: FastifyRequest, reply: FastifyReply) => {
       const { email, fullName } = request.body as { email: string; fullName: string };
@@ -268,20 +269,142 @@ async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
       };
     });
     
-    fastify.post("/auth/logout", async () => ({ success: true, message: "Logged out successfully" }));
+    fastify.post("/auth/logout", {
+      preHandler: [authenticateHook],
+      schema: {
+        description: "Logout user and invalidate session",
+        tags: ["Auth"],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              message: { type: "string" }
+            }
+          }
+        }
+      }
+    }, async (request: FastifyRequest, reply: FastifyReply) => {
+      await logout(request.sessionToken as string);
+      reply.clearCookie("session_token");
+      return { success: true, message: "Logged out successfully" };
+    });
     
-    fastify.get("/auth/me", async (request: FastifyRequest) => ({ success: true, user: request.user }));
+    fastify.get("/auth/me", {
+      preHandler: [authenticateHook],
+      schema: {
+        description: "Get current authenticated user",
+        tags: ["Auth"],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              user: { type: "object" }
+            }
+          }
+        }
+      }
+    }, async (request: FastifyRequest) => {
+      const user = await getCurrentUser(request.user?.id as string);
+      if (!user) {
+        throw fastify.httpErrors.notFound("User not found");
+      }
+      return { success: true, user };
+    });
     
-    fastify.patch("/auth/profile", async (request: FastifyRequest) => {
-      const { name, avatar } = request.body as { name?: string; avatar?: string };
-      const user = request.user;
+    fastify.patch("/auth/profile", {
+      preHandler: [authenticateHook],
+      schema: {
+        description: "Update user profile",
+        tags: ["Auth"],
+        body: {
+          type: "object",
+          properties: {
+            fullName: { type: "string" },
+            locale: { type: "string" },
+            avatar: { type: "string" }
+          }
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              user: { type: "object" }
+            }
+          }
+        }
+      }
+    }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const { fullName, locale, avatar } = request.body as { fullName?: string; locale?: string; avatar?: string };
+      const userId = request.user?.id as string;
+      
+      // Import repository function
+      const { updateUser } = require("./modules/auth/repository");
+      
+      const updates: Record<string, string> = {};
+      if (fullName !== undefined) updates.full_name = fullName;
+      if (locale !== undefined) updates.locale = locale;
+      if (avatar !== undefined) updates.avatar = avatar;
+      
+      if (Object.keys(updates).length === 0) {
+        reply.status(400);
+        return { statusCode: 400, error: "Bad Request", message: "No fields to update" };
+      }
+      
+      const updatedUser = await updateUser(userId, updates);
+      if (!updatedUser) {
+        throw fastify.httpErrors.notFound("User not found");
+      }
+      
       return { 
         success: true, 
-        user: user ? { 
-          ...user, 
-          name: name || user.name,
-          avatar: avatar || user.avatar
-        } : undefined
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          fullName: updatedUser.full_name,
+          locale: updatedUser.locale,
+          avatar: updatedUser.avatar,
+          createdAt: updatedUser.created_at,
+          updatedAt: updatedUser.updated_at
+        }
+      };
+    });
+    
+    // Add alias for OTP verify to maintain compatibility
+    fastify.post("/auth/otp/verify", {
+      preHandler: [otpVerifyRateLimiter],
+      schema: {
+        description: "Verify magic link token and create session (alias for /auth/verify)",
+        tags: ["Auth"],
+        body: {
+          type: "object",
+          required: ["token"],
+          properties: {
+            token: { type: "string" }
+          }
+        }
+      }
+    }, async (request: FastifyRequest, reply: FastifyReply) => {
+      const { token } = request.body as { token: string };
+      const result: AuthResult = await loginWithMagicLink(token, {
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"]
+      });
+      
+      reply.setCookie("session_token", result.sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+      
+      return {
+        success: true,
+        user: result.user,
+        token: result.sessionToken,
+        isNewUser: result.isNewUser
       };
     });
     
@@ -302,9 +425,13 @@ export async function registerLegacyRoutes(fastify: FastifyInstance): Promise<vo
     const { resolveSettingForContext, setSettingsValue, getSettingsValues } = require("./modules/settings");
     const { resolveSetting, getDefinition, getPublicDefinitions } = require(sharedPath);
     
+    // Public endpoint - no auth required
     fastify.get("/settings/definitions", async () => ({ settings: getPublicDefinitions() }));
     
-    fastify.post("/settings/resolve", async (request: FastifyRequest) => {
+    // Protected endpoints - require authentication
+    fastify.post("/settings/resolve", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest) => {
       const body = request.body as Record<string, unknown>;
       const definition = getDefinition(body.key as string);
       if (!definition) throw (fastify as FastifyInstance & { ApiError: { notFound: (msg: string) => Error } }).ApiError.notFound("Unknown setting key");
@@ -318,12 +445,16 @@ export async function registerLegacyRoutes(fastify: FastifyInstance): Promise<vo
       return resolveSetting(definition, (body.overrides as unknown[]) || [], (body.entitlements as Record<string, unknown>) || {});
     });
     
-    fastify.post("/settings/values", async (request: FastifyRequest) => {
+    fastify.post("/settings/values", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest) => {
       const id = await setSettingsValue(request.body as { scope: string; scopeId: string; key: string; value: unknown; updatedBy?: string });
       return { id };
     });
     
-    fastify.get("/settings/values", async (request: FastifyRequest) => {
+    fastify.get("/settings/values", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest) => {
       const values = await getSettingsValues(request.query as Record<string, string>);
       return { values };
     });
@@ -337,19 +468,39 @@ export async function registerLegacyRoutes(fastify: FastifyInstance): Promise<vo
   try {
     const entitlements = require("./modules/entitlements");
     
-    fastify.get("/entitlements/resolve", async (request: FastifyRequest) => {
+    fastify.get("/entitlements/resolve", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest) => {
       const { projectId, orgId } = request.query as { projectId?: string; orgId?: string };
       return { entitlements: await entitlements.resolveEntitlements({ projectId, orgId }) };
     });
     
-    fastify.post("/admin/plans", async (request: FastifyRequest) => {
+    fastify.post("/admin/plans", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest, reply: FastifyReply) => {
+      // Check admin role
+      const user = (request as unknown as { user?: { role?: string } }).user;
+      if (!user || user.role !== 'admin') {
+        reply.status(403);
+        return { error: "Forbidden", message: "Admin access required" };
+      }
       const body = request.body as { code: string; name: string };
       const id = await entitlements.createPlanEntry(body);
       request.audit({ action: "plan.created", targetType: "plan", targetId: id, metadata: { code: body.code } });
       return { id };
     });
     
-    fastify.get("/admin/plans", async () => ({ plans: await entitlements.listPlans() }));
+    fastify.get("/admin/plans", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest, reply: FastifyReply) => {
+      // Check admin role
+      const user = (request as unknown as { user?: { role?: string } }).user;
+      if (!user || user.role !== 'admin') {
+        reply.status(403);
+        return { error: "Forbidden", message: "Admin access required" };
+      }
+      return { plans: await entitlements.listPlans() };
+    });
     
     fastify.log.info("Legacy entitlements routes registered");
   } catch (error) {
@@ -360,7 +511,9 @@ export async function registerLegacyRoutes(fastify: FastifyInstance): Promise<vo
   try {
     const { createCampaignWithJobs } = require("./modules/messaging");
     
-    fastify.post("/messaging/campaigns", async (request: FastifyRequest) => {
+    fastify.post("/messaging/campaigns", {
+      preHandler: [(fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate || (async () => {})],
+    }, async (request: FastifyRequest) => {
       const body = request.body as { projectId: string; channel: string; subject: string; recipients: unknown[] };
       const result = await createCampaignWithJobs(body);
       request.audit({
@@ -405,81 +558,143 @@ async function registerProjectsRoutes(fastify: FastifyInstance): Promise<void> {
 }
 
 /**
+ * Register Admin Routes
+ */
+async function registerAdminRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const { registerAdminRoutes: registerRoutes } = require("./modules/admin/routes");
+    await registerRoutes(fastify);
+    fastify.log.info("Admin routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Admin module not available");
+  }
+}
+
+/**
  * Register Guests, Invites & RSVP routes
  */
 async function registerGuestsRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const guests = require("./modules/guests");
-
-    // Guest Groups
-    fastify.get("/projects/:projectId/groups", async (request: FastifyRequest) => {
-      const groups = await guests.getProjectGuestGroups((request.params as { projectId: string }).projectId);
-      return { groups };
-    });
-
-    fastify.post("/projects/:projectId/groups", async (request: FastifyRequest) => {
-      const id = await guests.createProjectGuestGroup(
-        (request.params as { projectId: string }).projectId,
-        request.body as { name: string; householdLabel?: string }
-      );
-      return { id };
-    });
-
-    fastify.put("/groups/:groupId", async (request: FastifyRequest) => {
-      await guests.updateProjectGuestGroup(
-        (request.params as { groupId: string }).groupId,
-        request.body as { name?: string; householdLabel?: string }
-      );
-      return { success: true };
-    });
-
-    fastify.delete("/groups/:groupId", async (request: FastifyRequest) => {
-      await guests.deleteProjectGuestGroup((request.params as { groupId: string }).groupId);
-      return { success: true };
-    });
-
-    // Guests
-    interface GetGuestsQuery {
-      groupId?: string;
-      role?: string;
-      tagId?: string;
-      search?: string;
-    }
-
-    fastify.get("/projects/:projectId/guests", async (request: FastifyRequest) => {
-      const guests_list = await guests.getProjectGuests(
-        (request.params as { projectId: string }).projectId,
-        request.query as GetGuestsQuery
-      );
-      return { guests: guests_list };
-    });
-
-    fastify.post("/projects/:projectId/guests", async (request: FastifyRequest) => {
-      const id = await guests.createProjectGuest(
-        (request.params as { projectId: string }).projectId,
-        request.body as Record<string, unknown>
-      );
-      return { id };
-    });
-
-    fastify.get("/projects/:projectId/guests/:guestId", async (request: FastifyRequest) => {
-      const guest = await guests.getGuest((request.params as { guestId: string }).guestId);
-      return { guest };
-    });
-
-    fastify.patch("/projects/:projectId/guests/:guestId", async (request: FastifyRequest) => {
-      await guests.updateProjectGuest((request.params as { guestId: string }).guestId, request.body as Record<string, unknown>);
-      return { success: true, message: "Guest updated successfully" };
-    });
-
-    fastify.delete("/projects/:projectId/guests/:guestId", async (request: FastifyRequest) => {
-      await guests.deleteProjectGuest((request.params as { guestId: string }).guestId);
-      return { success: true, message: "Guest deleted successfully" };
-    });
-
-    fastify.log.info("Guests routes registered");
+    const { guestRoutes } = require("./modules/guests/routes");
+    await fastify.register(guestRoutes, { prefix: "/" });
+    fastify.log.info("Guests routes registered via module");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Guests module not available");
+  }
+}
+
+/**
+ * Register Photos routes
+ */
+async function registerPhotosRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const { handlePhotosRoutes } = require("./modules/photos/routes");
+    
+    // Create a plugin that wraps the legacy route handler
+    await fastify.register(async (instance) => {
+      instance.addHook("onRequest", async (request, reply) => {
+        // Check if this is a photos route
+        const pathname = request.url.split("?")[0];
+        const isPhotosRoute = 
+          pathname.match(/^\/projects\/[^/]+\/photo-settings$/) ||
+          pathname.match(/^\/projects\/[^/]+\/photos/) ||
+          pathname.match(/^\/photos\//) ||
+          pathname === "/photos/upload-url" ||
+          pathname === "/photos/confirm-upload" ||
+          pathname === "/webhooks/s3/upload-complete";
+        
+        if (!isPhotosRoute) return;
+        
+        // Build request object for legacy handler
+        const reqInfo = {
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] || "",
+          userId: request.user?.id
+        };
+        
+        const result = await handlePhotosRoutes(
+          { ...request, pathname },
+          reply,
+          request.body,
+          reqInfo
+        );
+        
+        if (result) {
+          reply.status(result.status).send(result.body);
+        }
+      });
+    });
+    
+    fastify.log.info("Photos routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Photos module not available");
+  }
+}
+
+/**
+ * Register Seating routes
+ */
+async function registerSeatingRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const { handleSeatingRoutes } = require("./modules/seating/routes");
+    
+    // Create a plugin that wraps the legacy route handler
+    await fastify.register(async (instance) => {
+      instance.addHook("onRequest", async (request, reply) => {
+        // Check if this is a seating route
+        const pathname = request.url.split("?")[0];
+        const isSeatingRoute = 
+          pathname.match(/^\/events\/[^/]+\/floor-plans/) ||
+          pathname.match(/^\/events\/[^/]+\/check-in/) ||
+          pathname.match(/^\/events\/[^/]+\/check-ins/) ||
+          pathname.match(/^\/events\/[^/]+\/qr-code/) ||
+          pathname.match(/^\/events\/[^/]+\/guest-qr-code/) ||
+          pathname.match(/^\/events\/[^/]+\/seating-stats/) ||
+          pathname.match(/^\/floor-plans\//) ||
+          pathname.match(/^\/tables\//) ||
+          pathname.match(/^\/seating\//) ||
+          pathname.match(/^\/check-in\//) ||
+          pathname.match(/^\/check-ins\//);
+        
+        if (!isSeatingRoute) return;
+        
+        // Build request object for legacy handler
+        const reqInfo = {
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"] || "",
+          userId: request.user?.id
+        };
+        
+        const result = await handleSeatingRoutes(
+          { ...request, pathname },
+          reply,
+          request.body,
+          reqInfo
+        );
+        
+        if (result) {
+          reply.status(result.status).send(result.body);
+        }
+      });
+    });
+    
+    fastify.log.info("Seating routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Seating module not available");
+  }
+}
+
+/**
+ * Register Messaging routes
+ */
+async function registerMessagingRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const { messagingRoutes, webhookRoutes } = require("./modules/messaging/routes");
+    await fastify.register(messagingRoutes, { prefix: "/" });
+    await fastify.register(webhookRoutes, { prefix: "/" });
+    fastify.log.info("Messaging routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Messaging module not available");
   }
 }
 
@@ -502,12 +717,19 @@ export async function start(): Promise<FastifyInstance> {
       fastify.log.warn({ err: (error as Error).message }, "Auth module not available");
     }
     
+    // Store authenticate function for use in route registration
+    const authenticate = (fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate;
+    
     await registerLegacyRoutes(fastify);
     await registerModuleLoader(fastify);
     await registerAuthRoutes(fastify);
     await registerProjectsRoutes(fastify);
     await registerSitesRoutes(fastify);
     await registerGuestsRoutes(fastify);
+    await registerPhotosRoutes(fastify);
+    await registerSeatingRoutes(fastify);
+    await registerMessagingRoutes(fastify);
+    await registerAdminRoutes(fastify);
     
     await fastify.listen({
       port: SERVER.PORT,

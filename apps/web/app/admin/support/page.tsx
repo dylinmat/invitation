@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/page-header";
 import { Section, SectionHeader } from "@/components/layout/section";
@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/useToast";
+import { useAdminUsers, useAdminSupportTickets } from "@/hooks/useAdmin";
+import type { SupportTicket, AdminUser } from "@/lib/admin-api";
 import {
   Headphones,
   MessageSquare,
@@ -25,42 +27,12 @@ import {
   Send,
   Search,
   User,
-  Mail,
   Megaphone,
-  FileText,
   RefreshCw,
   Eye,
-  X,
-  AlertTriangle,
 } from "lucide-react";
 
 // Types
-interface SupportTicket {
-  id: string;
-  subject: string;
-  description: string;
-  status: "open" | "in_progress" | "waiting" | "resolved" | "closed";
-  priority: "low" | "medium" | "high" | "urgent";
-  customer: {
-    name: string;
-    email: string;
-    organization?: string;
-  };
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-  assignedTo?: string;
-}
-
-interface UserLookup {
-  id: string;
-  name: string;
-  email: string;
-  organization: string;
-  status: string;
-  lastActive: string;
-}
-
 interface SystemAnnouncement {
   id: string;
   title: string;
@@ -70,7 +42,7 @@ interface SystemAnnouncement {
   recipientCount: number;
 }
 
-// Mock data
+// Mock data for tickets until support tickets table is implemented
 const mockTickets: SupportTicket[] = [
   {
     id: "TKT-001",
@@ -121,14 +93,8 @@ const mockTickets: SupportTicket[] = [
   },
 ];
 
-const mockUserLookups: UserLookup[] = [
-  { id: "1", name: "John Smith", email: "john@example.com", organization: "Acme Corp", status: "active", lastActive: "2 mins ago" },
-  { id: "2", name: "Sarah Johnson", email: "sarah@techstart.io", organization: "TechStart", status: "active", lastActive: "1 hour ago" },
-  { id: "3", name: "Mike Chen", email: "mike@design.co", organization: "Design Co", status: "away", lastActive: "3 hours ago" },
-];
-
 const mockAnnouncements: SystemAnnouncement[] = [
-  { id: "1", title: "New Feature: AI Guest Matching", content: "We\'ve launched AI-powered seating arrangements...", type: "feature", sentAt: "2024-01-10T09:00:00Z", recipientCount: 12543 },
+  { id: "1", title: "New Feature: AI Guest Matching", content: "We've launched AI-powered seating arrangements...", type: "feature", sentAt: "2024-01-10T09:00:00Z", recipientCount: 12543 },
   { id: "2", title: "Scheduled Maintenance", content: "Platform will be down for maintenance on Jan 20...", type: "maintenance", sentAt: "2024-01-08T10:00:00Z", recipientCount: 12543 },
 ];
 
@@ -143,9 +109,7 @@ const itemVariants = {
 };
 
 export default function SupportPage() {
-  const [loading, setLoading] = useState(true);
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [announcements, setAnnouncements] = useState<SystemAnnouncement[]>([]);
+  const { toast } = useToast();
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({
@@ -154,15 +118,20 @@ export default function SupportPage() {
     type: "info" as SystemAnnouncement["type"],
   });
   const [userSearch, setUserSearch] = useState("");
-  const { toast } = useToast();
+  const [userPage, setUserPage] = useState(1);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setTickets(mockTickets);
-      setAnnouncements(mockAnnouncements);
-      setLoading(false);
-    }, 800);
-  }, []);
+  // Fetch real users for user lookup
+  const { data: usersData, isLoading: isUsersLoading } = useAdminUsers({
+    page: userPage,
+    limit: 10,
+    search: userSearch,
+  });
+
+  const users = usersData?.users || [];
+  const totalUsers = usersData?.total || 0;
+
+  const tickets = mockTickets;
+  const announcements = mockAnnouncements;
 
   const handleSendAnnouncement = () => {
     toast({
@@ -261,6 +230,48 @@ export default function SupportPage() {
     urgent: tickets.filter((t) => t.priority === "urgent").length,
   };
 
+  const userColumns: AdminColumn<AdminUser>[] = [
+    {
+      key: "name",
+      header: "Name",
+      accessor: (u) => (
+        <div>
+          <p className="font-medium text-sm">{u.name}</p>
+          <p className="text-xs text-muted-foreground">{u.email}</p>
+        </div>
+      ),
+      sortable: true,
+    },
+    {
+      key: "status",
+      header: "Status",
+      accessor: (u) => <StatusBadge status={u.status} />,
+      sortable: true,
+    },
+    {
+      key: "organizationCount",
+      header: "Organizations",
+      accessor: (u) => u.organizationCount,
+      sortable: true,
+    },
+    {
+      key: "lastActiveAt",
+      header: "Last Active",
+      accessor: (u) => u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleDateString() : "Never",
+      sortable: true,
+    },
+    {
+      key: "actions",
+      header: "",
+      accessor: (u) => (
+        <Button variant="outline" size="sm" asChild>
+          <a href={`/admin/users?search=${u.email}`}>View Profile</a>
+        </Button>
+      ),
+      align: "right",
+    },
+  ];
+
   return (
     <motion.div
       variants={containerVariants}
@@ -286,28 +297,24 @@ export default function SupportPage() {
         <StatsGrid columns={4}>
           <StatsCard
             title="Open Tickets"
-            value={loading ? "..." : stats.openTickets}
+            value={stats.openTickets}
             icon={MessageSquare}
-            loading={loading}
           />
           <StatsCard
             title="In Progress"
-            value={loading ? "..." : stats.inProgress}
+            value={stats.inProgress}
             icon={Clock}
-            loading={loading}
           />
           <StatsCard
             title="Resolved Today"
-            value={loading ? "..." : stats.resolved}
+            value={stats.resolved}
             icon={CheckCircle2}
-            loading={loading}
           />
           <StatsCard
             title="Urgent"
-            value={loading ? "..." : stats.urgent}
+            value={stats.urgent}
             icon={AlertCircle}
             variant={stats.urgent > 0 ? "danger" : "default"}
-            loading={loading}
           />
         </StatsGrid>
       </motion.div>
@@ -335,7 +342,7 @@ export default function SupportPage() {
                 data={tickets}
                 columns={ticketColumns}
                 keyExtractor={(t) => t.id}
-                loading={loading}
+                loading={false}
                 searchable
                 sortable
                 pagination
@@ -356,38 +363,26 @@ export default function SupportPage() {
                     placeholder="Search by name, email, or organization..."
                     className="pl-10"
                     value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
+                    onChange={(e) => {
+                      setUserSearch(e.target.value);
+                      setUserPage(1);
+                    }}
                   />
                 </div>
-                <div className="divide-y">
-                  {mockUserLookups
-                    .filter(
-                      (u) =>
-                        u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-                        u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-                        u.organization.toLowerCase().includes(userSearch.toLowerCase())
-                    )
-                    .map((user) => (
-                      <div key={user.id} className="flex items-center justify-between py-4">
-                        <div>
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                          <p className="text-xs text-muted-foreground">{user.organization}</p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <StatusBadge status={user.status} size="sm" />
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Last active: {user.lastActive}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            View Profile
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                <AdminDataTable
+                  data={users}
+                  columns={userColumns}
+                  keyExtractor={(u) => u.id}
+                  loading={isUsersLoading}
+                  searchable={false}
+                  sortable
+                  pagination
+                  pageSize={10}
+                  currentPage={userPage}
+                  totalItems={totalUsers}
+                  onPageChange={setUserPage}
+                  title={`Users (${totalUsers})`}
+                />
               </CardContent>
             </Card>
           </TabsContent>

@@ -512,4 +512,288 @@ export const analyticsApi = {
     ),
 };
 
+// ====================
+// Admin API
+// ====================
+
+export type AdminStats = {
+  totalUsers: number;
+  totalOrganizations: number;
+  totalEvents: number;
+  totalRevenue: number;
+  activeUsers: number;
+  newUsersToday: number;
+  revenueGrowth: number;
+  userGrowth: number;
+};
+
+export type SystemHealthStatus = "healthy" | "degraded" | "down";
+
+export type SystemHealth = {
+  api: { status: SystemHealthStatus; uptime: number };
+  database: { status: SystemHealthStatus; uptime: number };
+  storage: { status: SystemHealthStatus; uptime: number };
+  email: { status: SystemHealthStatus; uptime: number };
+  realtime: { status: SystemHealthStatus; uptime: number };
+};
+
+export type AdminActivityItem = {
+  id: string;
+  type: "user" | "org" | "billing" | "system" | "support";
+  description: string;
+  timestamp: string;
+  actor?: { name: string; email?: string };
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  role: "admin" | "user" | "super_admin";
+  status: "active" | "suspended" | "banned" | "unverified";
+  isVerified: boolean;
+  organizationCount: number;
+  lastActiveAt: string;
+  createdAt: string;
+  loginCount: number;
+};
+
+export type UserActivity = {
+  id: string;
+  action: string;
+  timestamp: string;
+  ip?: string;
+  userAgent?: string;
+};
+
+export type AdminOrganization = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: "free" | "pro" | "enterprise";
+  status: "active" | "suspended" | "archived";
+  memberCount: number;
+  projectCount: number;
+  owner: {
+    name: string;
+    email: string;
+  };
+  createdAt: string;
+  lastActiveAt: string;
+  monthlyRevenue: number;
+};
+
+export type SupportTicket = {
+  id: string;
+  subject: string;
+  status: "open" | "in_progress" | "resolved" | "closed";
+  priority: "low" | "medium" | "high" | "urgent";
+  user: {
+    name: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserLookup = {
+  id: string;
+  name: string;
+  email: string;
+  organization: string;
+  status: string;
+};
+
+export type SystemAnnouncement = {
+  id: string;
+  title: string;
+  message: string;
+  type: "info" | "warning" | "maintenance";
+  publishedAt: string;
+  expiresAt?: string;
+};
+
+export const adminApi = {
+  // Dashboard
+  getStats: () => api.get<AdminStats>("/admin/stats"),
+  getHealth: () => api.get<SystemHealth>("/admin/health"),
+  getRecentActivity: (limit?: number) =>
+    api.get<AdminActivityItem[]>("/admin/activities", { limit }),
+
+  // Users
+  getUsers: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    role?: string;
+  }) => api.get<{ users: AdminUser[]; total: number }>("/admin/users", params),
+
+  updateUserStatus: (id: string, status: string) =>
+    api.patch<AdminUser>(`/admin/users/${id}/status`, { status }),
+
+  deleteUser: (id: string) => api.delete<void>(`/admin/users/${id}`),
+
+  getUserActivity: (id: string) =>
+    api.get<UserActivity[]>(`/admin/users/${id}/activity`),
+
+  impersonateUser: (id: string) =>
+    api.post<{ token: string; user: AdminUser }>(`/admin/users/${id}/impersonate`),
+
+  bulkUpdateUserStatus: (ids: string[], status: string) =>
+    api.post<void>("/admin/users/bulk-status", { ids, status }),
+
+  bulkDeleteUsers: (ids: string[]) =>
+    api.post<void>("/admin/users/bulk-delete", { ids }),
+
+  // Organizations
+  getOrganizations: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    plan?: string;
+  }) =>
+    api.get<{ organizations: AdminOrganization[]; total: number }>(
+      "/admin/organizations",
+      params
+    ),
+
+  updateOrganizationStatus: (id: string, status: string) =>
+    api.patch<AdminOrganization>(`/admin/organizations/${id}/status`, {
+      status,
+    }),
+
+  archiveOrganization: (id: string) =>
+    api.post<void>(`/admin/organizations/${id}/archive`),
+
+  transferOrganizationOwnership: (id: string, newOwnerId: string) =>
+    api.post<void>(`/admin/organizations/${id}/transfer`, {
+      newOwnerId,
+    }),
+
+  bulkArchiveOrganizations: (ids: string[]) =>
+    api.post<void>("/admin/organizations/bulk-archive", { ids }),
+
+  bulkDeleteOrganizations: (ids: string[]) =>
+    api.post<void>("/admin/organizations/bulk-delete", { ids }),
+
+  // Support
+  getTickets: (params?: { status?: string; priority?: string }) =>
+    api.get<{ tickets: SupportTicket[]; total: number }>(
+      "/admin/support/tickets",
+      params
+    ),
+
+  updateTicketStatus: (id: string, status: string) =>
+    api.patch<SupportTicket>(`/admin/support/tickets/${id}/status`, {
+      status,
+    }),
+
+  searchUsers: (query: string) =>
+    api.get<UserLookup[]>("/admin/users/search", { query }),
+
+  // Announcements
+  getAnnouncements: () =>
+    api.get<SystemAnnouncement[]>("/admin/announcements"),
+
+  createAnnouncement: (data: {
+    title: string;
+    message: string;
+    type: "info" | "warning" | "maintenance";
+    expiresAt?: string;
+  }) => api.post<SystemAnnouncement>("/admin/announcements", data),
+
+  deleteAnnouncement: (id: string) =>
+    api.delete<void>(`/admin/announcements/${id}`),
+};
+
+// ====================
+// User Organizations API
+// ====================
+
+export type UserOrganization = {
+  id: string;
+  name: string;
+  role: "Owner" | "Admin" | "Member";
+  slug: string;
+};
+
+export const userApi = {
+  getUserOrganizations: () =>
+    api.get<UserOrganization[]>("/auth/me/organizations"),
+};
+
+// ====================
+// Activity Feed API
+// ====================
+
+export type ActivityFeedItem = {
+  id: string;
+  type: "project_created" | "guest_added" | "invite_sent" | "rsvp_received" | "site_published";
+  actor: {
+    name: string;
+    avatar?: string;
+    initials?: string;
+  };
+  target: {
+    type: string;
+    name: string;
+    id: string;
+  };
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export const activityApi = {
+  getActivities: (params?: { limit?: number; offset?: number; types?: string[] }) =>
+    api.get<{ activities: ActivityFeedItem[]; hasMore: boolean }>("/activities", params),
+};
+
+// ====================
+// Team/Organization Members API
+// ====================
+
+export type TeamMember = {
+  id: string;
+  userId: string;
+  orgId: string;
+  name: string | null;
+  email: string;
+  avatar: string | null;
+  role: "owner" | "admin" | "member" | "viewer";
+  joinedAt: string;
+  lastActiveAt: string | null;
+  invitedBy: string | null;
+  status: "active" | "pending" | "suspended";
+};
+
+export type TeamRole = TeamMember["role"];
+
+export const teamApi = {
+  // List organization members
+  listMembers: (orgId: string) =>
+    api.get<{ members: TeamMember[] }>(`/organizations/${orgId}/members`),
+
+  // Invite member
+  inviteMember: (orgId: string, data: { email: string; role: TeamRole }) =>
+    api.post<{ member: TeamMember; inviteToken: string }>(`/organizations/${orgId}/members`, data),
+
+  // Update member role
+  updateMemberRole: (orgId: string, memberId: string, role: TeamRole) =>
+    api.patch<TeamMember>(`/organizations/${orgId}/members/${memberId}/role`, { role }),
+
+  // Remove member
+  removeMember: (orgId: string, memberId: string) =>
+    api.delete<void>(`/organizations/${orgId}/members/${memberId}`),
+
+  // Accept invitation
+  acceptInvite: (token: string) =>
+    api.post<TeamMember>(`/organizations/invites/${token}/accept`),
+
+  // Decline invitation
+  declineInvite: (token: string) =>
+    api.post<void>(`/organizations/invites/${token}/decline`),
+};
+
 export default api;

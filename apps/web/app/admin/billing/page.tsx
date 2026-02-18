@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/page-header";
-import { Section, SectionHeader } from "@/components/layout/section";
 import { StatsCard, StatsGrid } from "@/components/admin/stats-card";
 import { AdminDataTable, AdminColumn } from "@/components/admin/data-table";
 import { PaymentStatusBadge, SubscriptionStatusBadge } from "@/components/admin/status-badge";
@@ -14,34 +13,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/useToast";
+import { useAdminOrganizations, useAdminRevenue } from "@/hooks/useAdmin";
+import type { AdminOrganization } from "@/lib/admin-api";
 import {
   DollarSign,
   TrendingUp,
   TrendingDown,
   CreditCard,
-  FileText,
+  Receipt,
   Download,
   Plus,
-  ArrowUpRight,
   Users,
   Calendar,
-  Receipt,
   Tag,
-  MoreHorizontal,
 } from "lucide-react";
 
 // Types
-interface RevenueMetrics {
-  mrr: number;
-  arr: number;
-  totalRevenue: number;
-  revenueGrowth: number;
-  activeSubscriptions: number;
-  churnRate: number;
-  arpu: number;
-  ltv: number;
-}
-
 interface Invoice {
   id: string;
   customer: {
@@ -78,18 +65,17 @@ interface Coupon {
   isActive: boolean;
 }
 
-// Mock data
-const mockMetrics: RevenueMetrics = {
-  mrr: 48500,
-  arr: 582000,
-  totalRevenue: 1250000,
-  revenueGrowth: 23.5,
-  activeSubscriptions: 892,
-  churnRate: 2.3,
-  arpu: 54.32,
-  ltv: 1800,
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
 };
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+};
+
+// Mock data for invoices (would come from payment provider in real implementation)
 const mockInvoices: Invoice[] = [
   {
     id: "inv_1",
@@ -129,47 +115,42 @@ const mockInvoices: Invoice[] = [
   },
 ];
 
-const mockSubscriptions: Subscription[] = [
-  { id: "sub_1", customer: "Acme Corp", plan: "Enterprise", status: "active", mrr: 999, startDate: "2023-01-15", nextBillingDate: "2024-02-15" },
-  { id: "sub_2", customer: "TechStart Inc", plan: "Pro", status: "active", mrr: 199, startDate: "2023-03-20", nextBillingDate: "2024-02-20" },
-  { id: "sub_3", customer: "Design Co", plan: "Pro", status: "past_due", mrr: 199, startDate: "2023-06-10", nextBillingDate: "2024-01-10" },
-  { id: "sub_4", customer: "Small Biz LLC", plan: "Free", status: "cancelled", mrr: 0, startDate: "2023-08-15", nextBillingDate: "" },
-];
-
 const mockCoupons: Coupon[] = [
   { id: "c1", code: "WELCOME20", discount: "20% off", type: "percentage", value: 20, usageCount: 145, usageLimit: 500, expiresAt: "2024-12-31", isActive: true },
   { id: "c2", code: "EARLYBIRD", discount: "$50 off", type: "fixed", value: 50, usageCount: 89, usageLimit: 100, expiresAt: "2024-03-01", isActive: true },
   { id: "c3", code: "BLACKFRIDAY", discount: "50% off", type: "percentage", value: 50, usageCount: 0, usageLimit: 1000, expiresAt: "2024-11-30", isActive: false },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
-};
-
 export default function BillingPage() {
-  const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState<RevenueMetrics | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const { toast } = useToast();
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
-  useEffect(() => {
-    setTimeout(() => {
-      setMetrics(mockMetrics);
-      setInvoices(mockInvoices);
-      setSubscriptions(mockSubscriptions);
-      setCoupons(mockCoupons);
-      setLoading(false);
-    }, 800);
-  }, []);
+  // Fetch real revenue metrics
+  const { data: revenueData, isLoading: isRevenueLoading } = useAdminRevenue();
+  
+  // Fetch organizations for subscription data
+  const { data: orgsData, isLoading: isOrgsLoading } = useAdminOrganizations({
+    page,
+    limit: pageSize,
+  });
+
+  const metrics = revenueData;
+  const organizations = orgsData?.organizations || [];
+
+  // Transform organizations to subscriptions format
+  const subscriptions: Subscription[] = organizations
+    .filter(org => org.plan !== 'free')
+    .map(org => ({
+      id: `sub_${org.id}`,
+      customer: org.name,
+      plan: org.plan,
+      status: org.status === 'active' ? 'active' : 'paused',
+      mrr: org.plan === 'enterprise' ? 999 : 199,
+      startDate: org.createdAt,
+      nextBillingDate: new Date(new Date(org.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    }));
 
   const handleRefund = (invoice: Invoice) => {
     toast({
@@ -247,7 +228,7 @@ export default function BillingPage() {
     {
       key: "plan",
       header: "Plan",
-      accessor: (sub) => <Badge variant="outline">{sub.plan}</Badge>,
+      accessor: (sub) => <Badge variant="outline" className="capitalize">{sub.plan}</Badge>,
       sortable: true,
     },
     {
@@ -349,44 +330,68 @@ export default function BillingPage() {
         <StatsGrid columns={4}>
           <StatsCard
             title="Monthly Recurring Revenue"
-            value={loading ? "..." : `$${metrics?.mrr.toLocaleString()}`}
+            value={isRevenueLoading ? "..." : `$${metrics?.mrr.toLocaleString() || "0"}`}
             icon={DollarSign}
             trend={metrics ? { value: metrics.revenueGrowth, direction: "up", label: "vs last month" } : undefined}
-            loading={loading}
+            loading={isRevenueLoading}
           />
           <StatsCard
             title="Annual Recurring Revenue"
-            value={loading ? "..." : `$${metrics?.arr.toLocaleString()}`}
+            value={isRevenueLoading ? "..." : `$${metrics?.arr.toLocaleString() || "0"}`}
             icon={TrendingUp}
-            loading={loading}
+            loading={isRevenueLoading}
           />
           <StatsCard
             title="Active Subscriptions"
-            value={loading ? "..." : metrics?.activeSubscriptions.toLocaleString()}
+            value={isRevenueLoading ? "..." : metrics?.activeSubscriptions.toLocaleString() || "0"}
             icon={Users}
-            loading={loading}
+            loading={isRevenueLoading}
           />
           <StatsCard
             title="Churn Rate"
-            value={loading ? "..." : `${metrics?.churnRate}%`}
+            value={isRevenueLoading ? "..." : `${metrics?.churnRate || 0}%`}
             icon={TrendingDown}
             trend={metrics ? { value: -0.5, direction: "down", label: "vs last month" } : undefined}
-            loading={loading}
+            loading={isRevenueLoading}
           />
         </StatsGrid>
       </motion.div>
 
+      {/* Plan Distribution */}
+      {!isRevenueLoading && metrics?.planDistribution && (
+        <motion.div variants={itemVariants}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Plan Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-4">
+                {metrics.planDistribution.map((plan) => (
+                  <div key={plan.code} className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
+                    <span className="font-medium capitalize">{plan.name}</span>
+                    <Badge variant="secondary">{plan.count}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Main Content */}
       <motion.div variants={itemVariants}>
-        <Tabs defaultValue="invoices" className="space-y-6">
+        <Tabs defaultValue="subscriptions" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="invoices" className="gap-2">
-              <Receipt className="h-4 w-4" />
-              Invoices
-            </TabsTrigger>
             <TabsTrigger value="subscriptions" className="gap-2">
               <CreditCard className="h-4 w-4" />
               Subscriptions
+            </TabsTrigger>
+            <TabsTrigger value="invoices" className="gap-2">
+              <Receipt className="h-4 w-4" />
+              Invoices
             </TabsTrigger>
             <TabsTrigger value="coupons" className="gap-2">
               <Tag className="h-4 w-4" />
@@ -397,10 +402,10 @@ export default function BillingPage() {
           <TabsContent value="invoices">
             <Card>
               <AdminDataTable
-                data={invoices}
+                data={mockInvoices}
                 columns={invoiceColumns}
                 keyExtractor={(inv) => inv.id}
-                loading={loading}
+                loading={false}
                 searchable
                 sortable
                 pagination
@@ -416,11 +421,11 @@ export default function BillingPage() {
                 data={subscriptions}
                 columns={subscriptionColumns}
                 keyExtractor={(sub) => sub.id}
-                loading={loading}
+                loading={isOrgsLoading}
                 searchable
                 sortable
                 pagination
-                title="Active Subscriptions"
+                title={`Active Subscriptions (${subscriptions.length})`}
                 exportFileName="subscriptions"
               />
             </Card>
@@ -429,10 +434,10 @@ export default function BillingPage() {
           <TabsContent value="coupons">
             <Card>
               <AdminDataTable
-                data={coupons}
+                data={mockCoupons}
                 columns={couponColumns}
                 keyExtractor={(c) => c.id}
-                loading={loading}
+                loading={false}
                 searchable
                 sortable
                 pagination

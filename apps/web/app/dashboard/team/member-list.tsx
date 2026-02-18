@@ -5,13 +5,16 @@
  * Displays team members with role management capabilities
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { TeamMember, Role, Permission } from "@/lib/permissions";
 import { PermissionGate } from "@/components/permissions/permission-gate";
 import { useTeamPermissions } from "@/components/permissions/use-permissions";
 import { RoleBadge, RoleLabel, RoleComparison } from "@/components/permissions/role-badge";
 import { RoleSelect } from "./role-select";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { teamApi } from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
+import { Loader2 } from "lucide-react";
 
 // ============================================
 // Types
@@ -34,11 +37,13 @@ function MemberRow({
   currentUserId,
   onRoleChange,
   onRemove,
+  isLoading,
 }: {
   member: TeamMember;
   currentUserId?: string;
   onRoleChange: (memberId: string, newRole: Role) => void;
   onRemove: (member: TeamMember) => void;
+  isLoading?: boolean;
 }) {
   const permissions = useTeamPermissions();
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
@@ -163,12 +168,17 @@ function MemberRow({
               {canManageThisMember && (
                 <button
                   onClick={() => onRemove(member)}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  disabled={isLoading}
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Remove member"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  )}
                 </button>
               )}
             </PermissionGate>
@@ -222,14 +232,20 @@ function MemberRow({
 // Main Member List Component
 // ============================================
 
-export function MemberList({ members, onInviteClick }: MemberListProps) {
+export function MemberList({ members: initialMembers, onInviteClick }: MemberListProps) {
+  const { toast } = useToast();
   const [sortField, setSortField] = useState<SortField>("joinedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<TeamMember | null>(null);
+  const [members, setMembers] = useState<TeamMember[]>(initialMembers);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const permissions = useTeamPermissions();
+  
+  // Get current organization ID from context or props (using first member's orgId as fallback)
+  const currentOrgId = members[0]?.orgId || "";
 
   // Filter and sort members
   const filteredMembers = useMemo(() => {
@@ -285,22 +301,69 @@ export function MemberList({ members, onInviteClick }: MemberListProps) {
     }
   };
 
-  const handleRoleChange = (memberId: string, newRole: Role) => {
-    // TODO: Call API to update role
-    console.log(`Changing role for ${memberId} to ${newRole}`);
-  };
+  const handleRoleChange = useCallback(async (memberId: string, newRole: Role) => {
+    if (!currentOrgId) {
+      toast({
+        title: "Error",
+        description: "Organization not found",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setActionLoading(`role-${memberId}`);
+    try {
+      await teamApi.updateMemberRole(currentOrgId, memberId, newRole);
+      
+      // Update local state
+      setMembers(prev => prev.map(m => 
+        m.id === memberId ? { ...m, role: newRole } : m
+      ));
+      
+      toast({
+        title: "Role Updated",
+        description: "Member role has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update member role. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }, [currentOrgId, toast]);
 
   const handleRemove = (member: TeamMember) => {
     setShowRemoveConfirm(member);
   };
 
-  const confirmRemove = () => {
-    if (showRemoveConfirm) {
-      // TODO: Call API to remove member
-      console.log(`Removing member ${showRemoveConfirm.id}`);
+  const confirmRemove = useCallback(async () => {
+    if (!showRemoveConfirm || !currentOrgId) return;
+    
+    setActionLoading(`remove-${showRemoveConfirm.id}`);
+    try {
+      await teamApi.removeMember(currentOrgId, showRemoveConfirm.id);
+      
+      // Update local state
+      setMembers(prev => prev.filter(m => m.id !== showRemoveConfirm.id));
+      
+      toast({
+        title: "Member Removed",
+        description: `${showRemoveConfirm.name || showRemoveConfirm.email} has been removed from the team.`,
+      });
       setShowRemoveConfirm(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to remove member. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
     }
-  };
+  }, [showRemoveConfirm, currentOrgId, toast]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
@@ -428,6 +491,7 @@ export function MemberList({ members, onInviteClick }: MemberListProps) {
                   member={member}
                   onRoleChange={handleRoleChange}
                   onRemove={handleRemove}
+                  isLoading={actionLoading?.includes(member.id)}
                 />
               ))}
             </tbody>
@@ -478,8 +542,12 @@ export function MemberList({ members, onInviteClick }: MemberListProps) {
               </button>
               <button
                 onClick={confirmRemove}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                disabled={actionLoading === `remove-${showRemoveConfirm.id}`}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
+                {actionLoading === `remove-${showRemoveConfirm.id}` && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
                 Remove Member
               </button>
             </div>

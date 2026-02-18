@@ -13,6 +13,9 @@ import {
   BarChart3,
   ExternalLink,
   Edit,
+  Sparkles,
+  Bell,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +28,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectBreadcrumbs } from "@/components/ui/breadcrumbs";
+import { EmptyState } from "@/components/ui/empty-state";
 import { projectsApi } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,6 +73,43 @@ function StatCard({
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Coming Soon Tab Content
+function ComingSoonTab({
+  feature,
+  description,
+  icon: Icon,
+}: {
+  feature: string;
+  description: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <EmptyState
+          variant="custom"
+          icon={() => (
+            <div className="h-20 w-20 rounded-2xl bg-amber-50 flex items-center justify-center">
+              <Icon className="h-10 w-10 text-amber-400" />
+            </div>
+          )}
+          title={`${feature} coming soon`}
+          description={description}
+          primaryAction={{
+            label: "Get notified",
+            onClick: () => {},
+            icon: Bell,
+          }}
+          secondaryAction={{
+            label: "Learn more",
+            onClick: () => {},
+          }}
+        />
       </CardContent>
     </Card>
   );
@@ -136,25 +178,37 @@ export default function ProjectPage() {
     ? Math.round((stats.rsvpYes / stats.totalInvites) * 100)
     : 0;
 
+  // Generate preview URL
+  const previewUrl = project.sites?.[0]?.subdomain 
+    ? `https://${project.sites[0].subdomain}.eios.app`
+    : null;
+
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <ProjectBreadcrumbs 
+        projectName={project.name} 
+        projectId={project.id}
+      />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/dashboard">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Back to dashboard">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{project.name}</h1>
-              <Badge variant={project.status === "active" ? "success" : "secondary"}>
+              <Badge variant={project.status === "active" ? "default" : "secondary"}>
                 {project.status}
               </Badge>
             </div>
             {project.eventDate && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
                 Event date: {formatDate(project.eventDate)}
               </p>
             )}
@@ -162,17 +216,24 @@ export default function ProjectPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/editor/${projectId}`}>
-            <Button variant="outline">
-              <Edit className="mr-2 h-4 w-4" />
+            <Button variant="outline" className="gap-2">
+              <Edit className="h-4 w-4" />
               Open Editor
             </Button>
           </Link>
-          <Link href="#" target="_blank">
-            <Button variant="outline">
-              <ExternalLink className="mr-2 h-4 w-4" />
+          {previewUrl ? (
+            <Link href={previewUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Preview
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" className="gap-2" disabled>
+              <ExternalLink className="h-4 w-4" />
               Preview
             </Button>
-          </Link>
+          )}
         </div>
       </div>
 
@@ -225,11 +286,13 @@ export default function ProjectPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Link href={`/dashboard/projects/${projectId}/guests`}>
-                  <Button variant="outline" className="w-full">
-                    Manage Guests
-                  </Button>
-                </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setActiveTab("guests")}
+                >
+                  Manage Guests
+                </Button>
               </CardContent>
             </Card>
 
@@ -244,11 +307,13 @@ export default function ProjectPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Link href={`/dashboard/projects/${projectId}/invites`}>
-                  <Button variant="outline" className="w-full">
-                    Manage Invites
-                  </Button>
-                </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setActiveTab("invites")}
+                >
+                  Manage Invites
+                </Button>
               </CardContent>
             </Card>
 
@@ -263,80 +328,48 @@ export default function ProjectPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Link href={`/dashboard/projects/${projectId}/sites`}>
-                  <Button variant="outline" className="w-full">
-                    Manage Sites
-                  </Button>
-                </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setActiveTab("sites")}
+                >
+                  Manage Sites
+                </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="guests">
-          <Card>
-            <CardHeader>
-              <CardTitle>Guest Management</CardTitle>
-              <CardDescription>
-                This tab would show the full guest management interface
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Guest list, import, and management features would be implemented
-                here.
-              </p>
-            </CardContent>
-          </Card>
+          <ComingSoonTab
+            feature="Guest Management"
+            description="Import contacts, manage plus-ones, track dietary restrictions, and organize your guest list. This feature is currently in development and will be available soon."
+            icon={Users}
+          />
         </TabsContent>
 
         <TabsContent value="invites">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invitations</CardTitle>
-              <CardDescription>
-                Manage and send invitations to your guests
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Invitation creation, sending, and tracking would be implemented
-                here.
-              </p>
-            </CardContent>
-          </Card>
+          <ComingSoonTab
+            feature="Invitation Management"
+            description="Create beautiful invitations, send them via email or SMS, and track opens and RSVPs in real-time. This feature is currently in development and will be available soon."
+            icon={Mail}
+          />
         </TabsContent>
 
         <TabsContent value="sites">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sites</CardTitle>
-              <CardDescription>
-                Manage your invitation websites and landing pages
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Site management and publishing would be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <ComingSoonTab
+            feature="Site Builder"
+            description="Design stunning invitation websites with our drag-and-drop editor. Choose from templates or start from scratch. This feature is currently in development and will be available soon."
+            icon={LayoutTemplate}
+          />
         </TabsContent>
 
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Settings</CardTitle>
-              <CardDescription>
-                Configure project details and preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Project settings and configuration would be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <ComingSoonTab
+            feature="Project Settings"
+            description="Configure event details, customize branding, set up integrations, and manage project preferences. This feature is currently in development and will be available soon."
+            icon={Settings}
+          />
         </TabsContent>
       </Tabs>
     </div>

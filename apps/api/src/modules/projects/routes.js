@@ -101,12 +101,12 @@ const transformProject = (project) => ({
       secondaryColor: "#10B981"
     }
   },
-  stats: project.stats || {
-    totalGuests: 0,
-    totalInvites: 0,
-    rsvpYes: 0,
-    rsvpNo: 0,
-    rsvpPending: 0
+  stats: {
+    totalGuests: parseInt(project.guest_count) || 0,
+    totalInvites: parseInt(project.invite_count) || 0,
+    rsvpYes: parseInt(project.rsvp_yes_count) || 0,
+    rsvpNo: parseInt(project.rsvp_no_count) || 0,
+    rsvpPending: parseInt(project.rsvp_pending_count) || 0
   }
 });
 
@@ -170,9 +170,9 @@ async function registerProjectsRoutes(fastify) {
         stats: {
           totalGuests: parseInt(project.guest_count) || 0,
           totalInvites: parseInt(project.invite_count) || 0,
-          rsvpYes: 0, // TODO: Calculate from actual RSVP data
-          rsvpNo: 0,
-          rsvpPending: 0
+          rsvpYes: parseInt(project.rsvp_yes_count) || 0,
+          rsvpNo: parseInt(project.rsvp_no_count) || 0,
+          rsvpPending: parseInt(project.rsvp_pending_count) || 0
         }
       })
     );
@@ -309,13 +309,11 @@ async function registerProjectsRoutes(fastify) {
     return formatSuccess({
       project: transformProject({
         ...project,
-        stats: {
-          totalGuests: parseInt(stats.guest_count) || 0,
-          totalInvites: parseInt(stats.invite_count) || 0,
-          rsvpYes: 0,
-          rsvpNo: 0,
-          rsvpPending: 0
-        }
+        guest_count: stats.guest_count,
+        invite_count: stats.invite_count,
+        rsvp_yes_count: stats.rsvp_yes_count,
+        rsvp_no_count: stats.rsvp_no_count,
+        rsvp_pending_count: stats.rsvp_pending_count
       })
     });
   });
@@ -377,13 +375,11 @@ async function registerProjectsRoutes(fastify) {
     return formatSuccess({
       project: transformProject({
         ...updatedProject,
-        stats: {
-          totalGuests: parseInt(stats.guest_count) || 0,
-          totalInvites: parseInt(stats.invite_count) || 0,
-          rsvpYes: 0,
-          rsvpNo: 0,
-          rsvpPending: 0
-        }
+        guest_count: stats.guest_count,
+        invite_count: stats.invite_count,
+        rsvp_yes_count: stats.rsvp_yes_count,
+        rsvp_no_count: stats.rsvp_no_count,
+        rsvp_pending_count: stats.rsvp_pending_count
       })
     }, "Project updated successfully");
   });
@@ -473,6 +469,51 @@ async function registerProjectsRoutes(fastify) {
     return formatSuccess({
       project: transformProject(newProject)
     }, "Project duplicated successfully");
+  });
+
+  /**
+   * GET /projects/:id/stats
+   * Get project statistics
+   */
+  fastify.get("/projects/:id/stats", {
+    preHandler: [authenticate],
+    schema: {
+      description: "Get project statistics",
+      tags: ["Projects"],
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: { id: { type: "string" } }
+      }
+    }
+  }, async (request, reply) => {
+    // Check if project exists
+    const existingProject = await getProjectById(request.params.id);
+    if (!existingProject) {
+      reply.status(404);
+      return formatError(404, "Not Found", "Project not found");
+    }
+
+    // Check if user has access
+    const { isUserProjectMember, getProjectStats } = require("./repository");
+    const hasAccess = await isUserProjectMember(request.user.id, request.params.id);
+    
+    if (!hasAccess) {
+      reply.status(403);
+      return formatError(403, "Forbidden", "Access denied to this project");
+    }
+
+    const stats = await getProjectStats(request.params.id);
+    
+    return formatSuccess({
+      stats: {
+        totalGuests: parseInt(stats.guest_count, 10) || 0,
+        totalGroups: parseInt(stats.group_count, 10) || 0,
+        totalInvites: parseInt(stats.invite_count, 10) || 0,
+        totalSites: parseInt(stats.site_count, 10) || 0,
+        totalEvents: parseInt(stats.event_count, 10) || 0
+      }
+    });
   });
 
   fastify.log.info("Projects routes registered");

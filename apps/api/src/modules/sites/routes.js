@@ -25,6 +25,9 @@ const {
 async function siteRoutes(fastify, opts) {
   // Use authenticate hook from parent if available, otherwise require it
   const authenticate = fastify.authenticate || opts.authenticate;
+  
+  // Import project membership check function
+  const { isUserProjectMember } = require("../projects/repository");
 
   // ==================== Project Sites Routes ====================
 
@@ -45,8 +48,17 @@ async function siteRoutes(fastify, opts) {
         }
       }
     }
-  }, async (request) => {
+  }, async (request, reply) => {
     const { projectId } = request.params;
+    const userId = request.user?.id;
+    
+    // SECURITY: Verify user has access to this project
+    const hasAccess = await isUserProjectMember(userId, projectId);
+    if (!hasAccess) {
+      reply.status(403);
+      return { success: false, error: "Access denied to this project" };
+    }
+    
     const sites = await listProjectSites(projectId);
     return {
       success: true,
@@ -84,6 +96,15 @@ async function siteRoutes(fastify, opts) {
     }
   }, async (request, reply) => {
     const { projectId } = request.params;
+    const userId = request.user?.id;
+    
+    // SECURITY: Verify user has access to this project
+    const hasAccess = await isUserProjectMember(userId, projectId);
+    if (!hasAccess) {
+      reply.status(403);
+      return { success: false, error: "Access denied to this project" };
+    }
+    
     const { name, type, visibility, subdomainSlug, customDomain } = request.body;
 
     const site = await createSite({

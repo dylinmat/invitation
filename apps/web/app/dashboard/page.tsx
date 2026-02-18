@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Columns } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { projectsApi } from "@/lib/api";
 import { showToast } from "@/components/ui/toaster";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 // Dashboard components
 import { KPIDashboard } from "@/components/dashboard/kpi-dashboard";
@@ -37,15 +39,17 @@ import {
 
 // Create Project Dialog Component
 function CreateProjectDialog({
+  isOpen,
+  onOpenChange,
   onSuccess,
 }: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +66,7 @@ function CreateProjectDialog({
         description: "Your new project has been created successfully.",
         variant: "success",
       });
-      setIsOpen(false);
+      onOpenChange(false);
       setName("");
       setDescription("");
       onSuccess();
@@ -77,14 +81,16 @@ function CreateProjectDialog({
     }
   };
 
+  const handleClose = () => {
+    if (!isSubmitting) {
+      onOpenChange(false);
+      setName("");
+      setDescription("");
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
@@ -95,13 +101,14 @@ function CreateProjectDialog({
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Project Name</Label>
+              <Label htmlFor="name">Project Name *</Label>
               <Input
                 id="name"
                 placeholder="e.g., Sarah & John's Wedding"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
+                required
               />
             </div>
             <div className="space-y-2">
@@ -118,13 +125,20 @@ function CreateProjectDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button type="submit" disabled={!name.trim() || isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Project"}
+              {isSubmitting ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Creating...
+                </>
+              ) : (
+                "Create Project"
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -136,7 +150,15 @@ function CreateProjectDialog({
 // Main Dashboard Page
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { isAuthenticated } = useAuth();
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    projectId: string;
+    projectName: string;
+  }>({ isOpen: false, projectId: "", projectName: "" });
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -177,13 +199,24 @@ export default function DashboardPage() {
     isProcessing,
   } = useBulkProjectActions();
 
-  // Handlers for individual project actions - wrapped in useCallback to prevent unnecessary re-renders
-  const handleDeleteProject = useCallback(async (id: string) => {
+  // Handlers for individual project actions
+  const handleDeleteProject = useCallback((id: string) => {
+    const project = projects.find(p => p.id === id);
+    if (project) {
+      setConfirmDialog({
+        isOpen: true,
+        projectId: id,
+        projectName: project.name,
+      });
+    }
+  }, [projects]);
+
+  const confirmDelete = async () => {
     try {
-      await handleDelete([id]);
+      await handleDelete([confirmDialog.projectId]);
       showToast({
         title: "Project deleted",
-        description: "The project has been deleted successfully.",
+        description: `"${confirmDialog.projectName}" has been deleted successfully.`,
         variant: "success",
       });
     } catch {
@@ -192,8 +225,10 @@ export default function DashboardPage() {
         description: "Please try again later.",
         variant: "destructive",
       });
+    } finally {
+      setConfirmDialog({ isOpen: false, projectId: "", projectName: "" });
     }
-  }, [handleDelete]);
+  };
 
   const handleArchiveProject = useCallback(async (id: string) => {
     try {
@@ -251,6 +286,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
+
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -271,7 +309,19 @@ export default function DashboardPage() {
               Board View
             </Button>
           </Link>
-          <CreateProjectDialog onSuccess={refetchProjects} />
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <CreateProjectDialog
+              isOpen={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+              onSuccess={refetchProjects}
+            />
+          </Dialog>
         </div>
       </div>
 
@@ -290,7 +340,7 @@ export default function DashboardPage() {
             filters={filters}
             onSearchChange={setSearch}
             onStatusToggle={toggleStatus}
-            onClearStatus={clearStatusFilter}
+            onClearStatusFilter={clearStatusFilter}
             onSortByChange={setSortBy}
             onSortOrderToggle={toggleSortOrder}
             onClearFilters={clearFilters}
@@ -317,7 +367,7 @@ export default function DashboardPage() {
           ) : projects.length === 0 ? (
             <EmptyState
               type={hasActiveFilters ? "no-results" : "no-projects"}
-              onCreateClick={() => {}}
+              onCreateClick={() => setIsCreateDialogOpen(true)}
               onClearFilters={clearFilters}
             />
           ) : (
@@ -345,6 +395,20 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, projectId: "", projectName: "" })}
+        onConfirm={confirmDelete}
+        title="Delete Project"
+        description={`Are you sure you want to delete "${confirmDialog.projectName}"? This action cannot be undone and all associated data including guests, invitations, and sites will be permanently removed.`}
+        confirmText="Delete Project"
+        cancelText="Cancel"
+        variant="destructive"
+        requireTextInput={true}
+        confirmationText="DELETE"
+      />
     </div>
   );
 }

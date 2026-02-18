@@ -28,17 +28,17 @@ export function isValidEmail(email: string): boolean {
 
 /**
  * Generate a secure random token
+ * SECURITY: Requires secure random number generator (crypto.getRandomValues)
+ * Falls back to throwing an error rather than using insecure Math.random()
  */
 export function generateSecureToken(length: number = 32): string {
-  const array = new Uint8Array(length);
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(array);
-  } else {
-    // Fallback for older browsers
-    for (let i = 0; i < length; i++) {
-      array[i] = Math.floor(Math.random() * 256);
-    }
+  // Check for secure random number generator availability
+  if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
+    throw new Error('Secure random number generator not available. This browser is not supported.');
   }
+  
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 

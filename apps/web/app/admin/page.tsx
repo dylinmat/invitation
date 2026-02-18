@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/page-header";
 import { Section, SectionHeader } from "@/components/layout/section";
 import { StatsCard, StatsGrid } from "@/components/admin/stats-card";
-import { StatusBadge, SystemHealthBadge } from "@/components/admin/status-badge";
+import { SystemHealthBadge } from "@/components/admin/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Timeline } from "@/components/ui/timeline";
 import { useToast } from "@/hooks/useToast";
+import { useAdminDashboard } from "@/hooks/useAdmin";
 import {
   Users,
   Building2,
@@ -22,7 +20,6 @@ import {
   Activity,
   Server,
   Zap,
-  ArrowUpRight,
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
@@ -33,25 +30,6 @@ import {
 } from "lucide-react";
 
 // Types
-interface DashboardStats {
-  totalUsers: number;
-  totalOrganizations: number;
-  totalEvents: number;
-  totalRevenue: number;
-  activeUsers: number;
-  newUsersToday: number;
-  revenueGrowth: number;
-  userGrowth: number;
-}
-
-interface SystemHealth {
-  api: { status: "healthy" | "degraded" | "down"; uptime: number };
-  database: { status: "healthy" | "degraded" | "down"; uptime: number };
-  storage: { status: "healthy" | "degraded" | "down"; uptime: number };
-  email: { status: "healthy" | "degraded" | "down"; uptime: number };
-  realtime: { status: "healthy" | "degraded" | "down"; uptime: number };
-}
-
 interface ActivityItem {
   id: string;
   type: "user" | "org" | "billing" | "system" | "support";
@@ -59,78 +37,6 @@ interface ActivityItem {
   timestamp: string;
   actor?: { name: string; email?: string };
 }
-
-// Mock data - replace with actual API calls
-const mockStats: DashboardStats = {
-  totalUsers: 12453,
-  totalOrganizations: 892,
-  totalEvents: 3456,
-  totalRevenue: 128450,
-  activeUsers: 8234,
-  newUsersToday: 156,
-  revenueGrowth: 23.5,
-  userGrowth: 12.3,
-};
-
-const mockHealth: SystemHealth = {
-  api: { status: "healthy", uptime: 99.99 },
-  database: { status: "healthy", uptime: 99.95 },
-  storage: { status: "healthy", uptime: 99.98 },
-  email: { status: "healthy", uptime: 99.9 },
-  realtime: { status: "degraded", uptime: 97.5 },
-};
-
-const mockActivities: ActivityItem[] = [
-  {
-    id: "1",
-    type: "user",
-    description: "New user registration: sarah@example.com",
-    timestamp: "2024-01-15T10:30:00Z",
-    actor: { name: "System" },
-  },
-  {
-    id: "2",
-    type: "billing",
-    description: "Enterprise plan purchased by Acme Corp",
-    timestamp: "2024-01-15T09:45:00Z",
-    actor: { name: "John Smith", email: "john@acme.com" },
-  },
-  {
-    id: "3",
-    type: "org",
-    description: "New organization created: 'Tech Startups Inc'",
-    timestamp: "2024-01-15T09:20:00Z",
-    actor: { name: "Jane Doe", email: "jane@techstartups.com" },
-  },
-  {
-    id: "4",
-    type: "support",
-    description: "Support ticket #1234 resolved",
-    timestamp: "2024-01-15T08:15:00Z",
-    actor: { name: "Support Team" },
-  },
-  {
-    id: "5",
-    type: "system",
-    description: "Scheduled maintenance completed",
-    timestamp: "2024-01-15T06:00:00Z",
-    actor: { name: "System" },
-  },
-  {
-    id: "6",
-    type: "user",
-    description: "User account suspended: spam@example.com",
-    timestamp: "2024-01-14T16:30:00Z",
-    actor: { name: "Admin" },
-  },
-  {
-    id: "7",
-    type: "billing",
-    description: "Refund processed: $299.00",
-    timestamp: "2024-01-14T14:20:00Z",
-    actor: { name: "Finance Team" },
-  },
-];
 
 const quickActions = [
   { label: "Add User", icon: Users, href: "/admin/users" },
@@ -186,46 +92,29 @@ function getActivityColor(type: ActivityItem["type"]) {
   }
 }
 
+function cn(...classes: (string | undefined | false)[]) {
+  return classes.filter(Boolean).join(" ");
+}
+
 export default function AdminDashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Simulate API call
-    const loadData = async () => {
-      try {
-        // In production, replace with actual API calls
-        // const [statsRes, healthRes, activitiesRes] = await Promise.all([
-        //   fetch('/api/admin/stats'),
-        //   fetch('/api/admin/health'),
-        //   fetch('/api/admin/activities'),
-        // ]);
-        
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setStats(mockStats);
-        setHealth(mockHealth);
-        setActivities(mockActivities);
-      } catch (error) {
-        toast({
-          title: "Error loading dashboard",
-          description: "Failed to load dashboard data. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [toast]);
+  const { stats, health, activities, isLoading, isError, error, refetch } = useAdminDashboard();
 
   const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1000);
+    refetch();
+    toast({
+      title: "Dashboard refreshed",
+      description: "Latest data has been loaded.",
+    });
   };
+
+  if (isError) {
+    toast({
+      title: "Error loading dashboard",
+      description: error?.message || "Failed to load dashboard data. Please try again.",
+      variant: "destructive",
+    });
+  }
 
   return (
     <motion.div
@@ -240,8 +129,8 @@ export default function AdminDashboardPage() {
           title="Admin Dashboard"
           description="Platform overview and system management"
           actions={
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
-              <RefreshCw className="mr-2 h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           }
@@ -254,42 +143,42 @@ export default function AdminDashboardPage() {
           <StatsGrid columns={4}>
             <StatsCard
               title="Total Users"
-              value={loading ? "..." : stats?.totalUsers.toLocaleString() || "0"}
-              description={loading ? undefined : `${stats?.newUsersToday} new today`}
+              value={isLoading ? "..." : stats?.totalUsers.toLocaleString() || "0"}
+              description={isLoading ? undefined : `${stats?.newUsersToday || 0} new today`}
               icon={Users}
               trend={
-                loading
+                isLoading || !stats
                   ? undefined
-                  : { value: stats?.userGrowth || 0, direction: "up", label: "vs last month" }
+                  : { value: stats.userGrowth, direction: "up", label: "vs last month" }
               }
-              loading={loading}
+              loading={isLoading}
               variant="default"
             />
             <StatsCard
               title="Organizations"
-              value={loading ? "..." : stats?.totalOrganizations.toLocaleString() || "0"}
+              value={isLoading ? "..." : stats?.totalOrganizations.toLocaleString() || "0"}
               icon={Building2}
-              loading={loading}
+              loading={isLoading}
               variant="info"
             />
             <StatsCard
               title="Total Events"
-              value={loading ? "..." : stats?.totalEvents.toLocaleString() || "0"}
+              value={isLoading ? "..." : stats?.totalEvents.toLocaleString() || "0"}
               description="Across all organizations"
               icon={Calendar}
-              loading={loading}
+              loading={isLoading}
               variant="success"
             />
             <StatsCard
-              title="Revenue (MRR)"
-              value={loading ? "..." : `$${stats?.totalRevenue.toLocaleString() || "0"}`}
+              title="Active Projects"
+              value={isLoading ? "..." : stats?.activeProjects.toLocaleString() || "0"}
               icon={DollarSign}
               trend={
-                loading
+                isLoading || !stats
                   ? undefined
-                  : { value: stats?.revenueGrowth || 0, direction: "up", label: "vs last month" }
+                  : { value: stats.revenueGrowth, direction: "up", label: "vs last month" }
               }
-              loading={loading}
+              loading={isLoading}
               variant="default"
             />
           </StatsGrid>
@@ -308,7 +197,7 @@ export default function AdminDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {loading ? (
+              {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <Skeleton className="h-4 w-24" />
@@ -338,7 +227,11 @@ export default function AdminDashboardPage() {
                     <SystemHealthBadge health={health.realtime.status} uptime={health.realtime.uptime} />
                   </div>
                 </>
-              ) : null}
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  Health data unavailable
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -381,21 +274,23 @@ export default function AdminDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-yellow-800">Realtime service degraded</p>
-                  <p className="text-xs text-yellow-700 mt-1">
-                    Elevated latency detected in realtime connections
-                  </p>
+              {health?.realtime?.status === 'degraded' ? (
+                <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-800">Realtime service degraded</p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Elevated latency detected in realtime connections
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : null}
               <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-blue-800">Maintenance scheduled</p>
+                  <p className="text-sm font-medium text-blue-800">All systems operational</p>
                   <p className="text-xs text-blue-700 mt-1">
-                    System maintenance in 2 days at 02:00 UTC
+                    Platform running smoothly
                   </p>
                 </div>
               </div>
@@ -418,7 +313,7 @@ export default function AdminDashboardPage() {
           />
           <Card>
             <CardContent className="p-0">
-              {loading ? (
+              {isLoading ? (
                 <div className="p-6 space-y-4">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="flex items-start gap-4">
@@ -430,9 +325,9 @@ export default function AdminDashboardPage() {
                     </div>
                   ))}
                 </div>
-              ) : (
+              ) : activities && activities.length > 0 ? (
                 <div className="divide-y">
-                  {activities.map((activity) => {
+                  {activities.map((activity: ActivityItem) => {
                     const Icon = getActivityIcon(activity.type);
                     const colorClass = getActivityColor(activity.type);
                     return (
@@ -456,10 +351,17 @@ export default function AdminDashboardPage() {
                             </span>
                           </div>
                         </div>
-                        <StatusBadge status={activity.type} size="sm" showIcon={false} />
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {activity.type}
+                        </Badge>
                       </div>
                     );
                   })}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No recent activity</p>
                 </div>
               )}
             </CardContent>
@@ -468,8 +370,4 @@ export default function AdminDashboardPage() {
       </motion.div>
     </motion.div>
   );
-}
-
-function cn(...classes: (string | undefined | false)[]) {
-  return classes.filter(Boolean).join(" ");
 }
