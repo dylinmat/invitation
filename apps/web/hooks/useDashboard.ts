@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectsApi, Project, ApiError } from "@/lib/api";
 
@@ -43,44 +43,12 @@ export function useDashboardStats() {
   return useQuery<DashboardKPIs, ApiError>({
     queryKey: ["dashboard", "stats"],
     queryFn: async () => {
-      // In a real app, this would be a separate API endpoint
-      // For now, we'll calculate from projects data
-      const response = await projectsApi.list({ limit: 1000 });
-      const projects = response.projects;
-
-      let totalGuests = 0;
-      let totalInvitesSent = 0;
-      let totalRsvpYes = 0;
-      let totalRsvpTotal = 0;
-      let upcomingEventsCount = 0;
-      const now = new Date();
-
-      projects.forEach((project) => {
-        if (project.stats) {
-          totalGuests += project.stats.totalGuests;
-          totalInvitesSent += project.stats.totalInvites;
-          totalRsvpYes += project.stats.rsvpYes;
-          totalRsvpTotal +=
-            project.stats.rsvpYes + project.stats.rsvpNo + project.stats.rsvpPending;
-        }
-        if (project.eventDate) {
-          const eventDate = new Date(project.eventDate);
-          if (eventDate > now) {
-            upcomingEventsCount++;
-          }
-        }
-      });
-
-      const averageRSVPRate =
-        totalRsvpTotal > 0 ? Math.round((totalRsvpYes / totalRsvpTotal) * 100) : 0;
-
-      // Mock trends (in real app, compare with previous period)
+      // Use dedicated stats endpoint instead of fetching all projects
+      const stats = await projectsApi.getDashboardStats();
+      
+      // Mock trends (in real app, compare with previous period from API)
       return {
-        totalProjects: projects.length,
-        totalGuests,
-        totalInvitesSent,
-        averageRSVPRate,
-        upcomingEventsCount,
+        ...stats,
         trends: {
           projects: 12,
           guests: 8,
@@ -89,22 +57,24 @@ export function useDashboardStats() {
         },
       };
     },
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 5 * 60 * 1000, // 5 minutes - stats don't change often
+    gcTime: 10 * 60 * 1000,
   });
 }
 
 // ==================== Project Filters Hook ====================
 
-const defaultFilters: ProjectFilters = {
+// Factory function to create fresh default filters - prevents shared reference bugs
+const createDefaultFilters = (): ProjectFilters => ({
   status: [],
   dateRange: { from: null, to: null },
   search: "",
   sortBy: "date",
   sortOrder: "desc",
-};
+});
 
 export function useProjectFilters() {
-  const [filters, setFilters] = useState<ProjectFilters>(defaultFilters);
+  const [filters, setFilters] = useState<ProjectFilters>(createDefaultFilters);
 
   const setSearch = useCallback((search: string) => {
     setFilters((prev) => ({ ...prev, search }));
@@ -140,7 +110,7 @@ export function useProjectFilters() {
   }, []);
 
   const clearFilters = useCallback(() => {
-    setFilters(defaultFilters);
+    setFilters(createDefaultFilters()); // Create new object every time
   }, []);
 
   const hasActiveFilters = useMemo(() => {
@@ -168,9 +138,13 @@ export function useProjectFilters() {
 // ==================== Filtered Projects Hook ====================
 
 export function useFilteredProjects(filters: ProjectFilters) {
+  // Serialize filters for stable query key - prevents cache busting on every render
+  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
+  
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["projects", "filtered", filters],
+    queryKey: ["projects", "filtered", filtersKey],
     queryFn: () => projectsApi.list({ limit: 1000 }),
+    staleTime: 30 * 1000,
   });
 
   const filteredProjects = useMemo(() => {

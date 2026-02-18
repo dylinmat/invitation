@@ -28,6 +28,15 @@ type RequestOptions = {
   next?: NextFetchRequestConfig;
 };
 
+// Methods that require CSRF protection
+const CSRF_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+
+// Get CSRF token from meta tag
+function getCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || null;
+}
+
 // Build query string from params
 function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
   const searchParams = new URLSearchParams();
@@ -73,6 +82,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const token = getAuthToken();
   if (token) {
     defaultHeaders.Authorization = `Bearer ${token}`;
+  }
+  
+  // Add CSRF token for state-changing requests
+  if (CSRF_METHODS.includes(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      defaultHeaders["X-CSRF-Token"] = csrfToken;
+    }
   }
 
   const fetchOptions: RequestInit = {

@@ -5,8 +5,9 @@ import { KPICard, KPICardsSkeleton } from "./kpi-card";
 import { useDashboardStats } from "@/hooks/useDashboard";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ErrorBoundary } from "@/components/error-boundary";
 
-export function KPIDashboard() {
+function KPIDashboardContent() {
   const { data: stats, isLoading, error, refetch } = useDashboardStats();
 
   if (error) {
@@ -70,5 +71,13 @@ export function KPIDashboard() {
         className="col-span-2 sm:col-span-1"
       />
     </div>
+  );
+}
+
+export function KPIDashboard() {
+  return (
+    <ErrorBoundary>
+      <KPIDashboardContent />
+    </ErrorBoundary>
   );
 }

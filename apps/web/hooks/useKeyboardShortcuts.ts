@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 
 export interface ShortcutConfig {
   key: string;
@@ -13,14 +13,18 @@ export interface ShortcutConfig {
 }
 
 export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      for (const shortcut of shortcuts) {
+  // Use ref to always have latest shortcuts without re-attaching listener
+  const shortcutsRef = useRef(shortcuts);
+  shortcutsRef.current = shortcuts;
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      for (const shortcut of shortcutsRef.current) {
         const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase();
         const ctrlMatch = !!shortcut.ctrl === (e.ctrlKey || e.metaKey);
         const shiftMatch = !!shortcut.shift === e.shiftKey;
         const altMatch = !!shortcut.alt === e.altKey;
-
+        
         if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
           if (shortcut.preventDefault !== false) {
             e.preventDefault();
@@ -29,14 +33,11 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
           break;
         }
       }
-    },
-    [shortcuts]
-  );
-
-  useEffect(() => {
+    };
+    
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+  }, []); // Empty deps - listener attached once
 }
 
 // Hook for a single shortcut
@@ -61,9 +62,16 @@ export function useKeyboardShortcut(
     enabled = true,
   } = options || {};
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!enabled) return;
+  // Use refs to avoid re-attaching listeners when callbacks change
+  const handlerRef = useRef(handler);
+  const enabledRef = useRef(enabled);
+  
+  handlerRef.current = handler;
+  enabledRef.current = enabled;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!enabledRef.current) return;
 
       const keyMatch = e.key.toLowerCase() === key.toLowerCase();
       const ctrlMatch = ctrl || meta ? e.ctrlKey || e.metaKey : !e.ctrlKey && !e.metaKey;
@@ -74,14 +82,11 @@ export function useKeyboardShortcut(
         if (preventDefault) {
           e.preventDefault();
         }
-        handler(e);
+        handlerRef.current(e);
       }
-    },
-    [key, handler, ctrl, meta, shift, alt, preventDefault, enabled]
-  );
+    };
 
-  useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+  }, [key, ctrl, meta, shift, alt, preventDefault]); // handler and enabled NOT in deps
 }

@@ -1,13 +1,23 @@
 /**
  * Secure Local Storage Wrapper
- * Provides encryption and secure access to localStorage
+ * 
+ * ⚠️ IMPORTANT SECURITY NOTICE:
+ * This module provides basic obfuscation, NOT true encryption.
+ * 
+ * - Client-side "encryption" with a public key is SECURITY THEATER
+ * - The key is visible in the client bundle, making encryption trivial to break
+ * - For truly sensitive data, use HttpOnly cookies (server-side only)
+ * 
+ * This wrapper primarily provides:
+ * 1. Namespacing (prefixing keys)
+ * 2. Basic obfuscation to prevent casual inspection
+ * 3. Safe localStorage access with fallbacks
  */
 
 import { clearAuth } from "./auth";
 
 // Storage configuration
 const STORAGE_PREFIX = "eios_";
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_STORAGE_KEY || "eios-default-key";
 
 // Storage availability check
 function isStorageAvailable(): boolean {
@@ -23,41 +33,37 @@ function isStorageAvailable(): boolean {
   }
 }
 
-// Simple XOR encryption (for basic obfuscation - NOT for highly sensitive data)
-// For production, consider using a proper encryption library
-function xorEncrypt(text: string, key: string): string {
-  let result = "";
-  for (let i = 0; i < text.length; i++) {
-    result += String.fromCharCode(
-      text.charCodeAt(i) ^ key.charCodeAt(i % key.length)
-    );
-  }
-  return result;
-}
+// Basic obfuscation - NOT encryption
+// Uses a fixed salt for basic obfuscation only
+const OBFUSCATION_SALT = "eios-v1";
 
-function encrypt(value: string): string {
+function obfuscate(text: string): string {
   try {
-    const encrypted = xorEncrypt(value, ENCRYPTION_KEY);
-    return btoa(encrypted);
+    // Simple obfuscation - base64 with salt prefix
+    // This is NOT secure, just prevents casual inspection
+    const salted = OBFUSCATION_SALT + text;
+    return btoa(salted);
   } catch {
-    // Fallback to base64 if encryption fails
-    return btoa(value);
+    return text;
   }
 }
 
-function decrypt(value: string): string {
+function deobfuscate(value: string): string {
   try {
     const decoded = atob(value);
-    return xorEncrypt(decoded, ENCRYPTION_KEY);
+    if (decoded.startsWith(OBFUSCATION_SALT)) {
+      return decoded.slice(OBFUSCATION_SALT.length);
+    }
+    return decoded;
   } catch {
-    // If decryption fails, try to return as-is (for backwards compatibility)
+    // If deobfuscation fails, return as-is (for backwards compatibility)
     return value;
   }
 }
 
-// Check if value looks encrypted (base64 pattern)
-function isEncrypted(value: string): boolean {
-  // Basic check: encrypted values are base64 encoded
+// Check if value looks obfuscated (base64 pattern)
+function isObfuscated(value: string): boolean {
+  // Basic check: obfuscated values are base64 encoded
   const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
   return base64Regex.test(value) && value.length % 4 === 0;
 }
@@ -107,8 +113,8 @@ export function onStorageChange(handler: StorageEventHandler): () => void {
 
 // Secure storage interface
 export interface SecureStorage {
-  setItem(key: string, value: unknown, encrypt?: boolean): void;
-  getItem<T>(key: string, encrypted?: boolean): T | null;
+  setItem(key: string, value: unknown, obfuscate?: boolean): void;
+  getItem<T>(key: string, obfuscated?: boolean): T | null;
   removeItem(key: string): void;
   clear(): void;
   keys(): string[];
@@ -118,7 +124,7 @@ export interface SecureStorage {
 // Create secure storage instance
 function createSecureStorage(): SecureStorage {
   return {
-    setItem(key: string, value: unknown, shouldEncrypt = true): void {
+    setItem(key: string, value: unknown, shouldObfuscate = true): void {
       if (!isStorageAvailable()) {
         console.warn("[Storage] localStorage is not available");
         return;
@@ -128,9 +134,9 @@ function createSecureStorage(): SecureStorage {
         const prefixedKey = STORAGE_PREFIX + key;
         const serialized = JSON.stringify(value);
         
-        if (shouldEncrypt) {
-          const encrypted = encrypt(serialized);
-          localStorage.setItem(prefixedKey, encrypted);
+        if (shouldObfuscate) {
+          const obfuscated = obfuscate(serialized);
+          localStorage.setItem(prefixedKey, obfuscated);
         } else {
           localStorage.setItem(prefixedKey, serialized);
         }
@@ -139,7 +145,7 @@ function createSecureStorage(): SecureStorage {
         window.dispatchEvent(
           new StorageEvent("storage", {
             key: prefixedKey,
-            newValue: shouldEncrypt ? encrypt(serialized) : serialized,
+            newValue: shouldObfuscate ? obfuscate(serialized) : serialized,
           })
         );
       } catch (error) {
@@ -153,7 +159,7 @@ function createSecureStorage(): SecureStorage {
       }
     },
 
-    getItem<T>(key: string, encrypted = true): T | null {
+    getItem<T>(key: string, obfuscated = true): T | null {
       if (!isStorageAvailable()) {
         console.warn("[Storage] localStorage is not available");
         return null;
@@ -167,11 +173,11 @@ function createSecureStorage(): SecureStorage {
         
         let deserialized: string;
         
-        if (encrypted && isEncrypted(item)) {
+        if (obfuscated && isObfuscated(item)) {
           try {
-            deserialized = decrypt(item);
+            deserialized = deobfuscate(item);
           } catch {
-            // If decryption fails, assume it's not encrypted
+            // If deobfuscation fails, assume it's not obfuscated
             deserialized = item;
           }
         } else {

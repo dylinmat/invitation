@@ -42,21 +42,14 @@ interface UseAuthReturn extends AuthState {
   checkSession: () => boolean;
 }
 
-// Token refresh state
-interface TokenRefreshState {
-  isRefreshing: boolean;
-  lastRefresh: number | null;
-}
-
 // Auth hook
 export function useAuth(): UseAuthReturn {
   const router = useRouter();
   const queryClient = useQueryClient();
   const sessionCleanupRef = useRef<(() => void) | null>(null);
-  const refreshStateRef = useRef<TokenRefreshState>({
-    isRefreshing: false,
-    lastRefresh: null,
-  });
+  
+  // Use ref to track refresh in progress for deduplication
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -234,8 +227,13 @@ export function useAuth(): UseAuthReturn {
     router.push("/auth/login");
   }, [queryClient, router]);
 
-  // Refresh user function with token validation
+  // Refresh user function with token validation and deduplication
   const refreshUser = useCallback(async () => {
+    // Deduplicate concurrent calls
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+    
     const token = getToken();
     if (!token) {
       setState((prev) => ({ ...prev, isAuthenticated: false, user: null }));
@@ -245,88 +243,99 @@ export function useAuth(): UseAuthReturn {
     // Check if token is expired before fetching
     if (isTokenExpired(token)) {
       console.warn("[useAuth] Token expired, logging out");
-      logout();
+      await logout();
       return;
     }
     
-    try {
-      const { data } = await refetchUser();
-      if (data) {
-        setState((prev) => ({
-          ...prev,
-          user: data,
-        }));
-        // Update stored user
-        const currentToken = getToken();
-        if (currentToken) {
-          setAuth(currentToken, data);
+    const promise = (async () => {
+      try {
+        const { data } = await refetchUser();
+        if (data) {
+          setState((prev) => ({
+            ...prev,
+            user: data,
+          }));
+          // Update stored user
+          const currentToken = getToken();
+          if (currentToken) {
+            setAuth(currentToken, data);
+          }
+          // Update activity
+          updateActivity();
         }
-        // Update activity
-        updateActivity();
+      } catch (error) {
+        console.error("[useAuth] Failed to refresh user:", error);
+        // If 401, token might be invalid
+        if (error instanceof Error && error.message.includes("401")) {
+          await logout();
+        }
+      } finally {
+        refreshPromiseRef.current = null;
       }
-    } catch (error) {
-      console.error("[useAuth] Failed to refresh user:", error);
-      // If 401, token might be invalid
-      if (error instanceof Error && error.message.includes("401")) {
-        logout();
-      }
-    }
+    })();
+    
+    refreshPromiseRef.current = promise;
+    await promise;
   }, [refetchUser, logout]);
 
+  // Track last successful refresh timestamp
+  const lastRefreshRef = useRef<number>(0);
+  
   // Extend session (token refresh)
   const extendSession = useCallback(async (): Promise<boolean> => {
     const token = getToken();
     if (!token) return false;
     
     // Prevent concurrent refresh attempts
-    if (refreshStateRef.current.isRefreshing) {
-      return false;
+    if (refreshPromiseRef.current) {
+      await refreshPromiseRef.current;
+      return true;
     }
     
-    // Check if we recently refreshed
+    // Check if we recently refreshed (within 60 seconds)
     const now = Date.now();
-    if (
-      refreshStateRef.current.lastRefresh &&
-      now - refreshStateRef.current.lastRefresh < 60000
-    ) {
+    if (now - lastRefreshRef.current < 60000) {
       return true; // Assume still valid
     }
     
-    refreshStateRef.current.isRefreshing = true;
-    
-    try {
-      // Attempt to get current user - this validates the token
-      const { data } = await refetchUser();
-      
-      if (data) {
-        // Token is still valid
-        refreshStateRef.current.lastRefresh = now;
+    const promise = (async () => {
+      try {
+        // Attempt to get current user - this validates the token
+        const { data } = await refetchUser();
         
-        // Update stored user data
-        const currentToken = getToken();
-        if (currentToken) {
-          setAuth(currentToken, data);
+        if (data) {
+          // Token is still valid
+          lastRefreshRef.current = now;
+          
+          // Update stored user data
+          const currentToken = getToken();
+          if (currentToken) {
+            setAuth(currentToken, data);
+          }
+          
+          // Update activity and reset warning
+          updateActivity();
+          
+          // Update state
+          setState((prev) => ({
+            ...prev,
+            sessionInfo: getSessionInfo(),
+          }));
+          
+          return true;
         }
         
-        // Update activity and reset warning
-        updateActivity();
-        
-        // Update state
-        setState((prev) => ({
-          ...prev,
-          sessionInfo: getSessionInfo(),
-        }));
-        
-        return true;
+        return false;
+      } catch (error) {
+        console.error("[useAuth] Session extension failed:", error);
+        return false;
       }
-      
-      return false;
-    } catch (error) {
-      console.error("[useAuth] Session extension failed:", error);
-      return false;
-    } finally {
-      refreshStateRef.current.isRefreshing = false;
-    }
+    })();
+    
+    refreshPromiseRef.current = promise;
+    const result = await promise;
+    refreshPromiseRef.current = null;
+    return result;
   }, [refetchUser]);
 
   // Check if current session is valid

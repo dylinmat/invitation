@@ -117,6 +117,12 @@ const transformProject = (project) => ({
 async function registerProjectsRoutes(fastify) {
   // Use authenticate hook from fastify instance (provided by auth plugin)
   const authenticate = fastify.authenticate;
+  
+  // CRITICAL SECURITY: Fail hard if auth middleware is not available
+  if (!authenticate) {
+    fastify.log.error("Authentication middleware not available - projects routes cannot be registered safely");
+    throw new Error("Authentication middleware not available - cannot register project routes");
+  }
 
   // ========== Projects CRUD ==========
 
@@ -125,7 +131,7 @@ async function registerProjectsRoutes(fastify) {
    * List user's projects
    */
   fastify.get("/projects", {
-    preHandler: authenticate ? [authenticate] : [],
+    preHandler: [authenticate],
     schema: {
       description: "List user's projects",
       tags: ["Projects"],
@@ -153,31 +159,29 @@ async function registerProjectsRoutes(fastify) {
   }, async (request) => {
     const { page = 1, limit = 20 } = request.query;
     
-    // Get projects for the authenticated user
-    const projects = await listProjectsByUser(request.user.id);
+    // Get projects with embedded stats (single query, no N+1 problem)
+    const { projects, total, page: validatedPage, limit: validatedLimit } = 
+      await listProjectsByUser(request.user.id, { page, limit });
     
-    // Get stats for each project
-    const projectsWithStats = await Promise.all(
-      projects.map(async (project) => {
-        const stats = await getProjectStats(project.id);
-        return transformProject({
-          ...project,
-          stats: {
-            totalGuests: parseInt(stats.guest_count) || 0,
-            totalInvites: parseInt(stats.invite_count) || 0,
-            rsvpYes: 0, // TODO: Calculate from actual RSVP data
-            rsvpNo: 0,
-            rsvpPending: 0
-          }
-        });
+    // Transform projects with stats
+    const projectsWithStats = projects.map((project) =>
+      transformProject({
+        ...project,
+        stats: {
+          totalGuests: parseInt(project.guest_count) || 0,
+          totalInvites: parseInt(project.invite_count) || 0,
+          rsvpYes: 0, // TODO: Calculate from actual RSVP data
+          rsvpNo: 0,
+          rsvpPending: 0
+        }
       })
     );
 
     return formatSuccess({
       projects: projectsWithStats,
-      total: projectsWithStats.length,
-      page: parseInt(page),
-      limit: parseInt(limit)
+      total,
+      page: validatedPage,
+      limit: validatedLimit
     });
   });
 
@@ -186,7 +190,7 @@ async function registerProjectsRoutes(fastify) {
    * Create a new project
    */
   fastify.post("/projects", {
-    preHandler: authenticate ? [authenticate] : [],
+    preHandler: [authenticate],
     schema: {
       description: "Create a new project",
       tags: ["Projects"],
@@ -274,7 +278,7 @@ async function registerProjectsRoutes(fastify) {
    * Get a specific project
    */
   fastify.get("/projects/:id", {
-    preHandler: authenticate ? [authenticate] : [],
+    preHandler: [authenticate],
     schema: {
       description: "Get project by ID",
       tags: ["Projects"],
@@ -321,7 +325,7 @@ async function registerProjectsRoutes(fastify) {
    * Update a project
    */
   fastify.patch("/projects/:id", {
-    preHandler: authenticate ? [authenticate] : [],
+    preHandler: [authenticate],
     schema: {
       description: "Update project",
       tags: ["Projects"],
@@ -389,7 +393,7 @@ async function registerProjectsRoutes(fastify) {
    * Delete a project (soft delete)
    */
   fastify.delete("/projects/:id", {
-    preHandler: authenticate ? [authenticate] : [],
+    preHandler: [authenticate],
     schema: {
       description: "Delete project",
       tags: ["Projects"],

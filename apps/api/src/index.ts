@@ -10,6 +10,7 @@ import * as path from "path";
 import * as fs from "fs";
 
 import { SERVER } from "./config";
+import { checkConnection } from "./db";
 
 // Plugin imports
 import { registerCors } from "./plugins/cors";
@@ -171,7 +172,17 @@ export async function registerHealthRoutes(fastify: FastifyInstance): Promise<vo
   
   fastify.get("/ready", {
     config: { rateLimit: false },
-  }, async (): Promise<ReadyCheckResponse> => {
+  }, async (_request: FastifyRequest, reply: FastifyReply): Promise<ReadyCheckResponse> => {
+    const dbHealthy = await checkConnection();
+    
+    if (!dbHealthy) {
+      reply.status(503);
+      return {
+        status: "not_ready",
+        checks: { database: "unavailable" },
+      };
+    }
+    
     return {
       status: "ready",
       checks: { database: "ok" },

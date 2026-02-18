@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -176,8 +176,8 @@ export default function DashboardPage() {
     isProcessing,
   } = useBulkProjectActions();
 
-  // Handlers for individual project actions
-  const handleDeleteProject = async (id: string) => {
+  // Handlers for individual project actions - wrapped in useCallback to prevent unnecessary re-renders
+  const handleDeleteProject = useCallback(async (id: string) => {
     try {
       await handleDelete([id]);
       showToast({
@@ -192,9 +192,9 @@ export default function DashboardPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [handleDelete]);
 
-  const handleArchiveProject = async (id: string) => {
+  const handleArchiveProject = useCallback(async (id: string) => {
     try {
       await handleArchive([id]);
       showToast({
@@ -209,9 +209,9 @@ export default function DashboardPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [handleArchive]);
 
-  const handleDuplicateProject = async (id: string) => {
+  const handleDuplicateProject = useCallback(async (id: string) => {
     try {
       await handleDuplicate([id]);
       showToast({
@@ -226,16 +226,16 @@ export default function DashboardPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [handleDuplicate]);
 
   // Select all visible projects
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (selectedCount === projects.length) {
       clearSelection();
     } else {
       selectAll(projects.map((p) => p.id));
     }
-  };
+  }, [selectedCount, projects.length, clearSelection, selectAll]);
 
   // Show loading state during SSR or before mount
   if (!mounted) {
@@ -267,7 +267,8 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Dashboard */}
-      <section>
+      <section aria-labelledby="kpi-heading">
+        <h2 id="kpi-heading" className="sr-only">Key Performance Indicators</h2>
         <KPIDashboard />
       </section>
 

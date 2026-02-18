@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence, LazyMotion, domAnimation } from "framer-motion";
 import {
   Search,
   Home,
@@ -14,7 +14,6 @@ import {
   FileText,
   HelpCircle,
   Clock,
-  Command,
   ArrowRight,
   Sparkles,
 } from "lucide-react";
@@ -39,12 +38,24 @@ interface RecentProject {
   visitedAt: Date;
 }
 
+// HTML escape utility to prevent XSS
+function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Mock recent projects - in real app, this would come from localStorage or API
 const getRecentProjects = (): RecentProject[] => {
   if (typeof window === "undefined") return [];
   const stored = localStorage.getItem("eios_recent_projects");
   if (stored) {
-    return JSON.parse(stored).slice(0, 5);
+    try {
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) ? parsed.slice(0, 5) : [];
+    } catch {
+      return [];
+    }
   }
   return [
     { id: "1", name: "Sarah's Wedding", visitedAt: new Date() },
@@ -71,9 +82,13 @@ function fuzzySearch(query: string, text: string): boolean {
 function highlightMatch(text: string, query: string): React.ReactNode {
   if (!query) return text;
   
+  // Sanitize the text first to prevent XSS
+  const safeText = escapeHtml(text);
+  const safeQuery = escapeHtml(query);
+  
   const parts: { text: string; match: boolean }[] = [];
-  const textLower = text.toLowerCase();
-  const queryLower = query.toLowerCase();
+  const textLower = safeText.toLowerCase();
+  const queryLower = safeQuery.toLowerCase();
   
   let lastIndex = 0;
   let queryIndex = 0;
@@ -81,16 +96,16 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   for (let i = 0; i < textLower.length && queryIndex < queryLower.length; i++) {
     if (textLower[i] === queryLower[queryIndex]) {
       if (i > lastIndex) {
-        parts.push({ text: text.slice(lastIndex, i), match: false });
+        parts.push({ text: safeText.slice(lastIndex, i), match: false });
       }
-      parts.push({ text: text[i], match: true });
+      parts.push({ text: safeText[i], match: true });
       lastIndex = i + 1;
       queryIndex++;
     }
   }
   
-  if (lastIndex < text.length) {
-    parts.push({ text: text.slice(lastIndex), match: false });
+  if (lastIndex < safeText.length) {
+    parts.push({ text: safeText.slice(lastIndex), match: false });
   }
   
   return (
@@ -101,13 +116,90 @@ function highlightMatch(text: string, query: string): React.ReactNode {
           className={cn(
             part.match && "bg-rose-200 text-rose-900 rounded px-0.5"
           )}
-        >
-          {part.text}
-        </span>
+          dangerouslySetInnerHTML={{ __html: part.text }}
+        />
       ))}
     </>
   );
 }
+
+// Stable command definitions - defined outside component to prevent recreation
+const NAV_COMMANDS: Omit<CommandItem, "action">[] = [
+  {
+    id: "nav-dashboard",
+    title: "Go to Dashboard",
+    description: "View your projects overview",
+    icon: <Home className="w-4 h-4" />,
+    shortcut: "G D",
+    group: "Navigation",
+    keywords: ["home", "overview", "main"],
+  },
+  {
+    id: "nav-projects",
+    title: "Go to Projects",
+    description: "Browse all your projects",
+    icon: <FolderKanban className="w-4 h-4" />,
+    shortcut: "G P",
+    group: "Navigation",
+    keywords: ["projects", "list", "all"],
+  },
+  {
+    id: "nav-settings",
+    title: "Go to Settings",
+    description: "Manage your account settings",
+    icon: <Settings className="w-4 h-4" />,
+    shortcut: "G S",
+    group: "Navigation",
+    keywords: ["preferences", "config", "account"],
+  },
+];
+
+const ACTION_COMMANDS: Omit<CommandItem, "action">[] = [
+  {
+    id: "action-create",
+    title: "Create Project",
+    description: "Start a new invitation project",
+    icon: <Plus className="w-4 h-4" />,
+    shortcut: "C P",
+    group: "Actions",
+    keywords: ["new", "add", "start"],
+  },
+  {
+    id: "action-invite",
+    title: "Send Invites",
+    description: "Send invitations to your guests",
+    icon: <Mail className="w-4 h-4" />,
+    group: "Actions",
+    keywords: ["email", "send", "guests"],
+  },
+  {
+    id: "action-export",
+    title: "Export Data",
+    description: "Export your project data",
+    icon: <Download className="w-4 h-4" />,
+    group: "Actions",
+    keywords: ["download", "backup", "save"],
+  },
+];
+
+const HELP_COMMANDS: Omit<CommandItem, "action">[] = [
+  {
+    id: "help-docs",
+    title: "Documentation",
+    description: "Read our guides and tutorials",
+    icon: <FileText className="w-4 h-4" />,
+    group: "Help",
+    keywords: ["docs", "guide", "tutorial", "help"],
+  },
+  {
+    id: "help-support",
+    title: "Support",
+    description: "Get help from our team",
+    icon: <HelpCircle className="w-4 h-4" />,
+    group: "Help",
+    keywords: ["contact", "help", "assist"],
+  },
+];
 
 export function CommandPalette() {
   const router = useRouter();
@@ -117,77 +209,48 @@ export function CommandPalette() {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   // Load recent projects on mount
   useEffect(() => {
     setRecentProjects(getRecentProjects());
   }, []);
 
-  // Define all commands
-  const commands: CommandItem[] = useMemo(() => {
-    const navCommands: CommandItem[] = [
-      {
-        id: "nav-dashboard",
-        title: "Go to Dashboard",
-        description: "View your projects overview",
-        icon: <Home className="w-4 h-4" />,
-        shortcut: "G D",
-        group: "Navigation",
-        action: () => router.push("/dashboard"),
-        keywords: ["home", "overview", "main"],
+  // Build commands with actions - only depends on recentProjects
+  const commands = useMemo<CommandItem[]>(() => {
+    const navCommands: CommandItem[] = NAV_COMMANDS.map((cmd) => ({
+      ...cmd,
+      action: () => {
+        switch (cmd.id) {
+          case "nav-dashboard":
+            router.push("/dashboard");
+            break;
+          case "nav-projects":
+            router.push("/dashboard/projects");
+            break;
+          case "nav-settings":
+            router.push("/dashboard/settings");
+            break;
+        }
       },
-      {
-        id: "nav-projects",
-        title: "Go to Projects",
-        description: "Browse all your projects",
-        icon: <FolderKanban className="w-4 h-4" />,
-        shortcut: "G P",
-        group: "Navigation",
-        action: () => router.push("/dashboard/projects"),
-        keywords: ["projects", "list", "all"],
-      },
-      {
-        id: "nav-settings",
-        title: "Go to Settings",
-        description: "Manage your account settings",
-        icon: <Settings className="w-4 h-4" />,
-        shortcut: "G S",
-        group: "Navigation",
-        action: () => router.push("/dashboard/settings"),
-        keywords: ["preferences", "config", "account"],
-      },
-    ];
+    }));
 
-    const actionCommands: CommandItem[] = [
-      {
-        id: "action-create",
-        title: "Create Project",
-        description: "Start a new invitation project",
-        icon: <Plus className="w-4 h-4" />,
-        shortcut: "C P",
-        group: "Actions",
-        action: () => router.push("/dashboard/projects/new"),
-        keywords: ["new", "add", "start"],
+    const actionCommands: CommandItem[] = ACTION_COMMANDS.map((cmd) => ({
+      ...cmd,
+      action: () => {
+        switch (cmd.id) {
+          case "action-create":
+            router.push("/dashboard/projects/new");
+            break;
+          case "action-invite":
+            router.push("/dashboard/invites");
+            break;
+          case "action-export":
+            router.push("/dashboard/export");
+            break;
+        }
       },
-      {
-        id: "action-invite",
-        title: "Send Invites",
-        description: "Send invitations to your guests",
-        icon: <Mail className="w-4 h-4" />,
-        group: "Actions",
-        action: () => router.push("/dashboard/invites"),
-        keywords: ["email", "send", "guests"],
-      },
-      {
-        id: "action-export",
-        title: "Export Data",
-        description: "Export your project data",
-        icon: <Download className="w-4 h-4" />,
-        group: "Actions",
-        action: () => router.push("/dashboard/export"),
-        keywords: ["download", "backup", "save"],
-      },
-    ];
+    }));
 
     const recentCommands: CommandItem[] = recentProjects.map((project) => ({
       id: `recent-${project.id}`,
@@ -199,26 +262,16 @@ export function CommandPalette() {
       keywords: ["recent", "history"],
     }));
 
-    const helpCommands: CommandItem[] = [
-      {
-        id: "help-docs",
-        title: "Documentation",
-        description: "Read our guides and tutorials",
-        icon: <FileText className="w-4 h-4" />,
-        group: "Help",
-        action: () => window.open("/docs", "_blank"),
-        keywords: ["docs", "guide", "tutorial", "help"],
+    const helpCommands: CommandItem[] = HELP_COMMANDS.map((cmd) => ({
+      ...cmd,
+      action: () => {
+        if (cmd.id === "help-docs") {
+          window.open("/docs", "_blank");
+        } else if (cmd.id === "help-support") {
+          router.push("/support");
+        }
       },
-      {
-        id: "help-support",
-        title: "Support",
-        description: "Get help from our team",
-        icon: <HelpCircle className="w-4 h-4" />,
-        group: "Help",
-        action: () => router.push("/support"),
-        keywords: ["contact", "help", "assist"],
-      },
-    ];
+    }));
 
     return [...navCommands, ...actionCommands, ...recentCommands, ...helpCommands];
   }, [router, recentProjects]);
@@ -254,7 +307,8 @@ export function CommandPalette() {
   // Focus input when opened
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const timeoutId = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [isOpen]);
 
@@ -303,14 +357,25 @@ export function CommandPalette() {
 
   // Scroll selected item into view
   useEffect(() => {
-    const element = document.getElementById(`cmd-item-${selectedIndex}`);
+    const element = itemRefs.current.get(selectedIndex);
     element?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
+
+  // Close on route change
+  useEffect(() => {
+    if (isOpen) {
+      setIsOpen(false);
+      setSearchQuery("");
+    }
+  }, [router]);
 
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
+        aria-expanded={false}
+        aria-haspopup="dialog"
+        aria-label="Open command palette"
         className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
       >
         <Search className="w-3.5 h-3.5" />
@@ -323,158 +388,176 @@ export function CommandPalette() {
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
-          />
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* Backdrop */}
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => setIsOpen(false)}
+              aria-hidden="true"
+            />
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-[20%] -translate-x-1/2 z-50 w-full max-w-[640px] mx-4"
-          >
-            <div className="bg-background rounded-xl shadow-2xl border overflow-hidden">
-              {/* Search Input */}
-              <div className="flex items-center gap-3 px-4 py-4 border-b">
-                <Search className="w-5 h-5 text-muted-foreground" />
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type a command or search..."
-                  className="flex-1 bg-transparent outline-none text-base placeholder:text-muted-foreground"
-                />
-                <kbd className="px-2 py-1 text-xs bg-muted rounded">ESC</kbd>
-              </div>
+            {/* Modal */}
+            <m.div
+              initial={{ opacity: 0, scale: 0.95, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed left-1/2 top-[20%] -translate-x-1/2 z-50 w-full max-w-[640px] mx-4"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Command palette"
+            >
+              <div className="bg-background rounded-xl shadow-2xl border overflow-hidden">
+                {/* Search Input */}
+                <div className="flex items-center gap-3 px-4 py-4 border-b">
+                  <Search className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a command or search..."
+                    className="flex-1 bg-transparent outline-none text-base placeholder:text-muted-foreground"
+                    role="combobox"
+                    aria-expanded={flatCommands.length > 0}
+                    aria-controls="command-list"
+                    aria-activedescendant={flatCommands[selectedIndex]?.id}
+                  />
+                  <kbd className="px-2 py-1 text-xs bg-muted rounded">ESC</kbd>
+                </div>
 
-              {/* Results */}
-              <div
-                ref={listRef}
-                className="max-h-[400px] overflow-y-auto p-2"
-              >
-                {flatCommands.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                      <Search className="w-6 h-6 text-muted-foreground" />
+                {/* Results */}
+                <div
+                  ref={listRef}
+                  id="command-list"
+                  role="listbox"
+                  className="max-h-[400px] overflow-y-auto p-2"
+                >
+                  {flatCommands.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                        <Search className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground">
+                        No results found for &quot;{searchQuery}&quot;
+                      </p>
+                      <p className="text-sm text-muted-foreground/70 mt-1">
+                        Try different keywords or check your spelling
+                      </p>
                     </div>
-                    <p className="text-muted-foreground">
-                      No results found for &quot;{searchQuery}&quot;
-                    </p>
-                    <p className="text-sm text-muted-foreground/70 mt-1">
-                      Try different keywords or check your spelling
-                    </p>
-                  </div>
-                ) : (
-                  Object.entries(groupedCommands).map(([group, items]) => (
-                    <div key={group} className="mb-4 last:mb-0">
-                      <h3 className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        {group}
-                      </h3>
-                      <div className="space-y-1">
-                        {items.map((cmd, idx) => {
-                          const globalIndex = flatCommands.findIndex((c) => c.id === cmd.id);
-                          const isSelected = globalIndex === selectedIndex;
+                  ) : (
+                    Object.entries(groupedCommands).map(([group, items]) => (
+                      <div key={group} className="mb-4 last:mb-0">
+                        <h3 className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          {group}
+                        </h3>
+                        <div className="space-y-1">
+                          {items.map((cmd) => {
+                            const globalIndex = flatCommands.findIndex((c) => c.id === cmd.id);
+                            const isSelected = globalIndex === selectedIndex;
 
-                          return (
-                            <button
-                              key={cmd.id}
-                              id={`cmd-item-${globalIndex}`}
-                              onClick={() => {
-                                cmd.action();
-                                setIsOpen(false);
-                                setSearchQuery("");
-                              }}
-                              onMouseEnter={() => setSelectedIndex(globalIndex)}
-                              className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150",
-                                isSelected
-                                  ? "bg-rose-100 text-rose-900"
-                                  : "hover:bg-muted text-foreground"
-                              )}
-                            >
-                              <span
+                            return (
+                              <button
+                                key={cmd.id}
+                                id={cmd.id}
+                                ref={(el) => {
+                                  if (el) itemRefs.current.set(globalIndex, el);
+                                }}
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  cmd.action();
+                                  setIsOpen(false);
+                                  setSearchQuery("");
+                                }}
+                                onMouseEnter={() => setSelectedIndex(globalIndex)}
                                 className={cn(
-                                  "p-1.5 rounded-md",
-                                  isSelected ? "bg-rose-200" : "bg-muted"
+                                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150",
+                                  isSelected
+                                    ? "bg-rose-100 text-rose-900"
+                                    : "hover:bg-muted text-foreground"
                                 )}
                               >
-                                {cmd.icon}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm">
-                                  {highlightMatch(cmd.title, searchQuery)}
-                                </p>
-                                {cmd.description && (
-                                  <p
+                                <span
+                                  className={cn(
+                                    "p-1.5 rounded-md",
+                                    isSelected ? "bg-rose-200" : "bg-muted"
+                                  )}
+                                  aria-hidden="true"
+                                >
+                                  {cmd.icon}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm">
+                                    {highlightMatch(cmd.title, searchQuery)}
+                                  </p>
+                                  {cmd.description && (
+                                    <p
+                                      className={cn(
+                                        "text-xs truncate",
+                                        isSelected
+                                          ? "text-rose-700"
+                                          : "text-muted-foreground"
+                                      )}
+                                    >
+                                      {cmd.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {cmd.shortcut && (
+                                  <kbd
                                     className={cn(
-                                      "text-xs truncate",
+                                      "px-1.5 py-0.5 text-xs rounded hidden sm:block",
                                       isSelected
-                                        ? "text-rose-700"
-                                        : "text-muted-foreground"
+                                        ? "bg-rose-200 text-rose-800"
+                                        : "bg-muted text-muted-foreground"
                                     )}
                                   >
-                                    {cmd.description}
-                                  </p>
+                                    {cmd.shortcut}
+                                  </kbd>
                                 )}
-                              </div>
-                              {cmd.shortcut && (
-                                <kbd
-                                  className={cn(
-                                    "px-1.5 py-0.5 text-xs rounded hidden sm:block",
-                                    isSelected
-                                      ? "bg-rose-200 text-rose-800"
-                                      : "bg-muted text-muted-foreground"
-                                  )}
-                                >
-                                  {cmd.shortcut}
-                                </kbd>
-                              )}
-                              {isSelected && (
-                                <ArrowRight className="w-4 h-4 opacity-50" />
-                              )}
-                            </button>
-                          );
-                        })}
+                                {isSelected && (
+                                  <ArrowRight className="w-4 h-4 opacity-50" aria-hidden="true" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30 text-xs text-muted-foreground">
-                <div className="flex items-center gap-4">
+                {/* Footer */}
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 bg-background border rounded">↑↓</kbd>
+                      to navigate
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 bg-background border rounded">↵</kbd>
+                      to select
+                    </span>
+                  </div>
                   <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 bg-background border rounded">↑↓</kbd>
-                    to navigate
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 bg-background border rounded">↵</kbd>
-                    to select
+                    <Sparkles className="w-3 h-3" aria-hidden="true" />
+                    EIOS Command Palette
                   </span>
                 </div>
-                <span className="flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  EIOS Command Palette
-                </span>
               </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            </m.div>
+          </>
+        )}
+      </AnimatePresence>
+    </LazyMotion>
   );
 }
