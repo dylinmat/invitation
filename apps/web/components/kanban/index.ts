@@ -12,7 +12,7 @@ export type {
   KanbanBoardProps,
   KanbanColumnProps,
   KanbanCardProps,
-  KanbanColumn,
+  KanbanColumnData,
   KanbanBoardData,
   ColumnStatus,
   DragOverlayProps,

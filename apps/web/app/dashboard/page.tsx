@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, LayoutKanban } from "lucide-react";
+import { Plus, Columns } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -267,7 +267,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <Link href="/dashboard/board">
             <Button variant="outline" className="gap-2">
-              <LayoutKanban className="h-4 w-4" />
+              <Columns className="h-4 w-4" />
               Board View
             </Button>
           </Link>

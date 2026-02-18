@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  LayoutKanban,
+  Columns,
   BarChart3,
   Calendar,
   Settings,

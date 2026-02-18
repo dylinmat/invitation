@@ -23,7 +23,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import {
-  LayoutKanban,
+  Columns,
   List,
   Filter,
   MoreHorizontal,
@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
 import { Project } from "@/lib/api";
 import {
   KanbanBoardProps,
-  KanbanColumn,
+  KanbanColumnData,
   KanbanBoardData,
   ColumnStatus,
   SortableData,
@@ -58,7 +58,7 @@ import { KanbanColumn as ColumnComponent } from "./column";
 import { KanbanDragOverlay } from "./drag-overlay";
 
 // Initial column configuration
-const DEFAULT_COLUMNS: KanbanColumn[] = [
+const DEFAULT_COLUMNS: KanbanColumnData[] = [
   {
     id: "draft",
     title: "Draft",
@@ -108,7 +108,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   // Initialize board data from projects
   const [boardData, setBoardData] = useState<KanbanBoardData>(() => {
-    const columns: KanbanColumn[] = DEFAULT_COLUMNS.map((col) => ({
+    const columns: KanbanColumnData[] = DEFAULT_COLUMNS.map((col) => ({
       ...col,
       projects: projects.filter((p) => p.status === col.id),
     }));
@@ -136,7 +136,7 @@ export function KanbanBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<"card" | "column" | null>(null);
   const [activeProject, setActiveProject] = useState<Project | undefined>();
-  const [activeColumn, setActiveColumn] = useState<KanbanColumn | undefined>();
+  const [activeColumn, setActiveColumn] = useState<KanbanColumnData | undefined>();
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");

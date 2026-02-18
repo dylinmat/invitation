@@ -7,7 +7,7 @@ import { Project } from "@/lib/api";
 
 export type ColumnStatus = "draft" | "active" | "archived";
 
-export interface KanbanColumn {
+export interface KanbanColumnData {
   id: ColumnStatus;
   title: string;
   color: string;
@@ -15,7 +15,7 @@ export interface KanbanColumn {
 }
 
 export interface KanbanBoardData {
-  columns: KanbanColumn[];
+  columns: KanbanColumnData[];
   columnOrder: ColumnStatus[];
 }
 
@@ -33,7 +33,7 @@ export interface KanbanCardProps {
 }
 
 export interface KanbanColumnProps {
-  column: KanbanColumn;
+  column: KanbanColumnData;
   index: number;
   isSelected?: boolean;
   selectedCardIds?: string[];
@@ -64,7 +64,7 @@ export interface DragOverlayProps {
   activeId: string | null;
   activeType: "card" | "column" | null;
   activeProject?: Project;
-  activeColumn?: KanbanColumn;
+  activeColumn?: KanbanColumnData;
 }
 
 // DnD Kit specific types
@@ -77,7 +77,7 @@ export interface SortableCardData {
 
 export interface SortableColumnData {
   type: "column";
-  column: KanbanColumn;
+  column: KanbanColumnData;
   index: number;
 }
 
