@@ -119,7 +119,7 @@ export default function LandingPage() {
               <a href="#how-it-works" className="text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium">How It Works</a>
               <a href="#stories" className="text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium">Stories</a>
               <Link href="/auth/login" className="text-stone-600 hover:text-stone-900 transition-colors text-sm font-medium">Sign In</Link>
-              <Link href="/auth/login">
+              <Link href="/auth/register">
                 <Button className="bg-stone-900 text-white hover:bg-stone-800 rounded-full px-6 text-sm font-medium">
                   Start Planning
                 </Button>
@@ -138,7 +138,7 @@ export default function LandingPage() {
                 <a href="#how-it-works" className="text-stone-600 hover:text-stone-900 py-2">How It Works</a>
                 <a href="#stories" className="text-stone-600 hover:text-stone-900 py-2">Stories</a>
                 <Link href="/auth/login" className="text-stone-600 hover:text-stone-900 py-2">Sign In</Link>
-                <Link href="/auth/login">
+                <Link href="/auth/register">
                   <Button className="bg-stone-900 text-white hover:bg-stone-800 rounded-full w-full">
                     Start Planning
                   </Button>
@@ -167,7 +167,7 @@ export default function LandingPage() {
                 track RSVPs, and communicate with ease.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/auth/login">
+                <Link href="/auth/register">
                   <Button className="bg-stone-900 text-white hover:bg-stone-800 rounded-full px-8 py-6 text-base font-medium inline-flex items-center gap-2">
                     Start Planning
                     <ArrowRight className="w-4 h-4" />
@@ -360,7 +360,7 @@ export default function LandingPage() {
             Start organizing your guest list today. Simple, elegant, and stress-free.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/login">
+            <Link href="/auth/register">
               <Button className="bg-stone-900 text-white hover:bg-stone-800 rounded-full px-10 py-6 text-lg font-medium inline-flex items-center gap-2">
                 Start Planning Now
                 <ArrowRight className="w-5 h-5" />

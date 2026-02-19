@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -11,115 +11,102 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useAuth, useRedirectIfAuthenticated } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { showToast } from "@/components/ui/toaster";
 import {
   Calendar,
   Mail,
+  User,
   ArrowLeft,
   CheckCircle,
   Loader2,
   Sparkles,
   Shield,
   Zap,
+  Building2,
   Users,
   Star,
   Lock,
-  Eye,
-  EyeOff,
-  Fingerprint,
   ArrowRight,
+  Check,
 } from "lucide-react";
 
-const loginSchema = z.object({
+const registerSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
-  rememberMe: z.boolean().optional(),
+  organization: z.string().min(2, "Organization name must be at least 2 characters"),
+  acceptTerms: z.boolean().refine((val) => val === true, {
+    message: "You must accept the terms and conditions",
+  }),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type RegisterForm = z.infer<typeof registerSchema>;
 
-// Testimonial data
+// Features list
+const features = [
+  { icon: Calendar, text: "Unlimited event planning" },
+  { icon: Users, text: "Guest list management" },
+  { icon: Shield, text: "Enterprise-grade security" },
+  { icon: Zap, text: "Real-time analytics" },
+];
+
+// Testimonials
 const testimonials = [
   {
-    quote: "EIOS transformed how we manage our wedding events. The RSVP tracking alone saved us 20 hours per event.",
-    author: "Sarah Chen",
-    role: "Event Planner",
-    company: "Bloom Events",
+    quote: "EIOS reduced our event planning time by 60%. The ROI was evident within the first month.",
+    author: "David Park",
+    role: "CEO",
+    company: "EventHorizon",
     rating: 5,
   },
   {
-    quote: "The analytics dashboard gives us insights we never had before. Our client satisfaction increased by 40%.",
-    author: "Michael Torres",
-    role: "Director of Operations",
-    company: "EventPro Solutions",
-    rating: 5,
-  },
-  {
-    quote: "From corporate galas to intimate dinners, EIOS handles everything flawlessly. Truly enterprise-grade.",
-    author: "Emma Wilson",
-    role: "Senior Event Coordinator",
-    company: "Gatherly",
+    quote: "The best event management platform we've used. Intuitive, powerful, and beautiful.",
+    author: "Lisa Thompson",
+    role: "Event Director",
+    company: "Summit Series",
     rating: 5,
   },
 ];
 
-// Stats data
-const stats = [
-  { value: "50K+", label: "Events Managed" },
-  { value: "2M+", label: "Invitations Sent" },
-  { value: "99.9%", label: "Uptime" },
-  { value: "4.9/5", label: "User Rating" },
-];
-
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isAuthenticated } = useAuth();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
   const [email, setEmail] = useState("");
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
-  const [showPassword, setShowPassword] = useState(false);
 
-  const redirect = searchParams.get("redirect");
+  const plan = searchParams.get("plan") || "free";
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
-      rememberMe: false,
+      acceptTerms: false,
     },
   });
 
-  // Auto-rotate testimonials
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Redirect if already authenticated
-  const { isLoading: isAuthLoading } = useRedirectIfAuthenticated(redirect || "/dashboard");
-
-  const onSubmit = async (data: LoginForm) => {
+  const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
     try {
+      // In a real implementation, you would call a register API here
+      // For now, we'll use the login flow which creates the user if not exists
       await login(data.email);
       setEmail(data.email);
       setIsSent(true);
       showToast({
-        title: "Magic link sent!",
-        description: "Check your email for the login link.",
+        title: "Welcome to EIOS!",
+        description: "Check your email to complete your registration.",
         variant: "success",
       });
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Registration error:", error);
       showToast({
-        title: "Failed to send magic link",
+        title: "Registration failed",
         description: "Please try again or contact support.",
         variant: "destructive",
       });
@@ -127,27 +114,6 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-
-  // Show loading state while checking auth
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#FDF8F5] via-white to-[#FDF8F5] flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-primary" />
-            </div>
-          </div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FDF8F5] via-white to-[#FDF8F5] flex">
@@ -179,7 +145,39 @@ export default function LoginPage() {
 
           {/* Main Content */}
           <div className="flex-1 flex flex-col justify-center max-w-xl">
-            {/* Animated Testimonial */}
+            {/* Features */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mb-12"
+            >
+              <h2 className="text-3xl xl:text-4xl font-bold text-[#2C1810] mb-6 leading-tight">
+                Start creating unforgettable events today
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                Join thousands of event professionals who trust EIOS for their most important occasions.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                {features.map((feature, index) => (
+                  <motion.div
+                    key={feature.text}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + index * 0.1 }}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-white/50 backdrop-blur-sm"
+                  >
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#8B6B5D] to-[#D4A574] rounded-lg flex items-center justify-center">
+                      <feature.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-sm font-medium text-[#2C1810]">{feature.text}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Testimonial */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTestimonial}
@@ -187,47 +185,29 @@ export default function LoginPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
-                className="mb-12"
+                className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-[#E8D5D0]/50"
               >
-                <div className="flex gap-1 mb-4">
+                <div className="flex gap-1 mb-3">
                   {[...Array(testimonials[currentTestimonial].rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-[#D4A574] text-[#D4A574]" />
+                    <Star key={i} className="w-4 h-4 fill-[#D4A574] text-[#D4A574]" />
                   ))}
                 </div>
-                <blockquote className="text-2xl xl:text-3xl font-medium text-[#2C1810] leading-relaxed mb-6">
-                  "{testimonials[currentTestimonial].quote}"
-                </blockquote>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#8B6B5D] to-[#D4A574] rounded-full flex items-center justify-center text-white font-semibold">
+                <p className="text-[#2C1810] mb-4">"{testimonials[currentTestimonial].quote}"</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#8B6B5D] to-[#D4A574] rounded-full flex items-center justify-center text-white font-semibold text-sm">
                     {testimonials[currentTestimonial].author.split(" ").map(n => n[0]).join("")}
                   </div>
                   <div>
-                    <p className="font-semibold text-[#2C1810]">
+                    <p className="font-semibold text-[#2C1810] text-sm">
                       {testimonials[currentTestimonial].author}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      {testimonials[currentTestimonial].role} at {testimonials[currentTestimonial].company}
+                    <p className="text-xs text-muted-foreground">
+                      {testimonials[currentTestimonial].role}, {testimonials[currentTestimonial].company}
                     </p>
                   </div>
                 </div>
               </motion.div>
             </AnimatePresence>
-
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-6">
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 + index * 0.1 }}
-                  className="text-center"
-                >
-                  <p className="text-2xl font-bold text-[#8B6B5D]">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
-                </motion.div>
-              ))}
-            </div>
           </div>
 
           {/* Trust Badges */}
@@ -238,7 +218,7 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-green-600" />
-              <span>256-bit Encryption</span>
+              <span>GDPR Compliant</span>
             </div>
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
@@ -248,8 +228,8 @@ export default function LoginPage() {
         </div>
       </motion.div>
 
-      {/* Right Side - Login Form */}
-      <div className="flex-1 flex flex-col justify-center p-6 sm:p-8 lg:p-12">
+      {/* Right Side - Registration Form */}
+      <div className="flex-1 flex flex-col justify-center p-6 sm:p-8 lg:p-12 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -289,21 +269,21 @@ export default function LoginPage() {
                     <Sparkles className="w-8 h-8 text-white" />
                   </motion.div>
                   <h1 className="text-2xl font-bold text-[#2C1810] mb-2">
-                    Welcome back
+                    Create your account
                   </h1>
                   <p className="text-muted-foreground">
-                    Sign in to manage your events
+                    Start your 14-day free trial. No credit card required.
                   </p>
                 </div>
 
-                {/* Social Login Options */}
+                {/* Social Sign Up Options */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                   <Button
                     variant="outline"
                     className="h-11 border-[#E8D5D0] hover:bg-[#FDF8F5]"
                     onClick={() => showToast({
                       title: "Coming soon",
-                      description: "Google login will be available soon.",
+                      description: "Google sign up will be available soon.",
                     })}
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -330,7 +310,7 @@ export default function LoginPage() {
                     className="h-11 border-[#E8D5D0] hover:bg-[#FDF8F5]"
                     onClick={() => showToast({
                       title: "Coming soon",
-                      description: "Microsoft login will be available soon.",
+                      description: "Microsoft sign up will be available soon.",
                     })}
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -342,7 +322,7 @@ export default function LoginPage() {
                     className="h-11 border-[#E8D5D0] hover:bg-[#FDF8F5]"
                     onClick={() => showToast({
                       title: "Coming soon",
-                      description: "Apple login will be available soon.",
+                      description: "Apple sign up will be available soon.",
                     })}
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -357,12 +337,38 @@ export default function LoginPage() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-white px-2 text-muted-foreground">
-                      Or continue with email
+                      Or sign up with email
                     </span>
                   </div>
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-[#2C1810]">
+                      Full name
+                    </Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        id="name"
+                        type="text"
+                        placeholder="John Smith"
+                        className="pl-11 h-12 border-[#E8D5D0] focus:border-[#8B6B5D] focus:ring-[#8B6B5D]"
+                        {...register("name")}
+                      />
+                    </div>
+                    {errors.name && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-destructive flex items-center gap-1"
+                      >
+                        <span className="inline-block w-1 h-1 rounded-full bg-destructive" />
+                        {errors.name.message}
+                      </motion.p>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-[#2C1810]">
                       Email address
@@ -389,34 +395,61 @@ export default function LoginPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="remember"
-                        {...register("rememberMe")}
-                        className="border-[#E8D5D0] data-[state=checked]:bg-[#8B6B5D] data-[state=checked]:border-[#8B6B5D]"
+                  <div className="space-y-2">
+                    <Label htmlFor="organization" className="text-[#2C1810]">
+                      Organization name
+                    </Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        id="organization"
+                        type="text"
+                        placeholder="Acme Inc."
+                        className="pl-11 h-12 border-[#E8D5D0] focus:border-[#8B6B5D] focus:ring-[#8B6B5D]"
+                        {...register("organization")}
                       />
-                      <Label
-                        htmlFor="remember"
-                        className="text-sm text-muted-foreground cursor-pointer"
-                      >
-                        Remember me for 30 days
-                      </Label>
                     </div>
-                    <Link
-                      href="#"
-                      className="text-sm text-[#8B6B5D] hover:text-[#6B4B3D] transition-colors"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        showToast({
-                          title: "Contact support",
-                          description: "Please contact support to recover your account.",
-                        });
-                      }}
-                    >
-                      Need help?
-                    </Link>
+                    {errors.organization && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-destructive flex items-center gap-1"
+                      >
+                        <span className="inline-block w-1 h-1 rounded-full bg-destructive" />
+                        {errors.organization.message}
+                      </motion.p>
+                    )}
                   </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Checkbox
+                      id="terms"
+                      {...register("acceptTerms")}
+                      className="mt-1 border-[#E8D5D0] data-[state=checked]:bg-[#8B6B5D] data-[state=checked]:border-[#8B6B5D]"
+                    />
+                    <Label
+                      htmlFor="terms"
+                      className="text-sm text-muted-foreground cursor-pointer leading-relaxed"
+                    >
+                      I agree to the{" "}
+                      <Link href="#" className="text-[#8B6B5D] hover:underline" onClick={(e) => {
+                        e.preventDefault();
+                        showToast({ title: "Coming soon", description: "Terms of Service page coming soon." });
+                      }}>
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link href="#" className="text-[#8B6B5D] hover:underline" onClick={(e) => {
+                        e.preventDefault();
+                        showToast({ title: "Coming soon", description: "Privacy Policy page coming soon." });
+                      }}>
+                        Privacy Policy
+                      </Link>
+                    </Label>
+                  </div>
+                  {errors.acceptTerms && (
+                    <p className="text-sm text-destructive">{errors.acceptTerms.message}</p>
+                  )}
 
                   <Button
                     type="submit"
@@ -426,55 +459,31 @@ export default function LoginPage() {
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Sending magic link...
+                        Creating account...
                       </>
                     ) : (
                       <>
-                        Send Magic Link
+                        Create free account
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </>
                     )}
                   </Button>
                 </form>
 
-                {/* Security Note */}
+                {/* Plan Info */}
                 <div className="mt-6 p-4 bg-[#FDF8F5] rounded-lg border border-[#E8D5D0]/50">
-                  <div className="flex items-start gap-3">
-                    <Fingerprint className="w-5 h-5 text-[#8B6B5D] mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-[#2C1810]">Passwordless Login</p>
-                      <p className="text-muted-foreground mt-1">
-                        We use secure magic links instead of passwords. No password to forget or compromise.
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-[#8B6B5D] to-[#D4A574] rounded-lg flex items-center justify-center">
+                      <Check className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-[#2C1810]">Free 14-day trial</p>
+                      <p className="text-xs text-muted-foreground">
+                        All features included. Cancel anytime.
                       </p>
                     </div>
                   </div>
                 </div>
-
-                {/* Terms */}
-                <p className="mt-6 text-center text-xs text-muted-foreground">
-                  By signing in, you agree to our{" "}
-                  <Link
-                    href="#"
-                    className="text-[#8B6B5D] hover:underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      showToast({ title: "Coming soon", description: "Terms of Service page coming soon." });
-                    }}
-                  >
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="#"
-                    className="text-[#8B6B5D] hover:underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      showToast({ title: "Coming soon", description: "Privacy Policy page coming soon." });
-                    }}
-                  >
-                    Privacy Policy
-                  </Link>
-                </p>
               </>
             ) : (
               <motion.div
@@ -492,18 +501,22 @@ export default function LoginPage() {
                 </motion.div>
 
                 <h2 className="text-2xl font-bold text-[#2C1810] mb-2">
-                  Check your email
+                  Verify your email
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  We sent a magic link to{" "}
+                  We sent a verification link to{" "}
                   <strong className="text-[#2C1810]">{email}</strong>
                 </p>
 
                 <div className="bg-[#FDF8F5] rounded-lg p-4 mb-6 text-left">
                   <p className="text-sm text-muted-foreground">
-                    <span className="font-medium text-[#2C1810]">Didn&apos;t receive it?</span>
+                    <span className="font-medium text-[#2C1810]">Next steps:</span>
                     <br />
-                    Check your spam folder or try again. The link expires in 15 minutes.
+                    1. Check your email for the verification link
+                    <br />
+                    2. Click the link to activate your account
+                    <br />
+                    3. Start creating your first event!
                   </p>
                 </div>
 
@@ -525,7 +538,7 @@ export default function LoginPage() {
                         setIsLoading(false);
                         showToast({
                           title: "Link resent",
-                          description: "Check your email for the new magic link.",
+                          description: "Check your email for the new verification link.",
                           variant: "success",
                         });
                       }, 1000);
@@ -535,22 +548,22 @@ export default function LoginPage() {
                     {isLoading ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
-                    Resend magic link
+                    Resend verification link
                   </Button>
                 </div>
               </motion.div>
             )}
           </div>
 
-          {/* Sign Up Link */}
+          {/* Sign In Link */}
           {!isSent && (
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
+              Already have an account?{" "}
               <Link
-                href="/auth/register"
+                href="/auth/login"
                 className="font-medium text-[#8B6B5D] hover:text-[#6B4B3D] transition-colors"
               >
-                Create one for free
+                Sign in
               </Link>
             </p>
           )}
