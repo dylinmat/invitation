@@ -796,4 +796,167 @@ export const teamApi = {
     api.post<void>(`/organizations/invites/${token}/decline`),
 };
 
+// ====================
+// User & Onboarding API
+// ====================
+
+export type Organization = {
+  id: string;
+  type: "COUPLE" | "PLANNER" | "VENUE";
+  name: string;
+  coupleNames?: { partner1: string; partner2: string };
+  eventDate?: string;
+  website?: string;
+  businessType?: string;
+};
+
+export type OnboardingData = {
+  type: "COUPLE" | "PLANNER" | "VENUE";
+  coupleNames?: { partner1: string; partner2: string };
+  eventDate?: string;
+  businessName?: string;
+  website?: string;
+  businessType?: "PLANNER" | "VENUE" | "VENDOR";
+};
+
+export const userApi = {
+  // Complete onboarding
+  completeOnboarding: (data: OnboardingData) =>
+    api.post<{ success: boolean; organization: Organization }>("/users/onboarding", data),
+
+  // Update selected plan
+  updatePlan: (plan: "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE") =>
+    api.put<{ success: boolean; plan: string }>("/users/plan", { plan }),
+
+  // Get organization
+  getOrganization: () =>
+    api.get<{ success: boolean; organization: Organization }>("/users/me/organization"),
+
+  // Get current user with org
+  getMe: () =>
+    api.get<{ success: boolean; user: User & { organizationId?: string; orgType?: string; onboardingCompleted?: boolean } }>("/users/me"),
+};
+
+// ====================
+// Dashboard API
+// ====================
+
+export type CoupleDashboardData = {
+  event: {
+    id: string;
+    name: string;
+    date: string;
+    daysLeft: number;
+    venue: string;
+    guestCount: number;
+  };
+  stats: {
+    guests: number;
+    rsvpRate: number;
+    daysLeft: number;
+    gifts: number;
+  };
+  checklist: Array<{
+    id: string;
+    text: string;
+    completed: boolean;
+    category: string;
+  }>;
+  recentActivity: Array<{
+    type: string;
+    message: string;
+    time: string;
+  }>;
+};
+
+export type BusinessDashboardData = {
+  clients: Array<{
+    id: string;
+    name: string;
+    type: string;
+    date: string;
+    status: string;
+    guests: number;
+    revenue: number;
+  }>;
+  events: Array<{
+    id: string;
+    name: string;
+    type: string;
+    date: string;
+    status: string;
+    guests: number;
+    revenue: number;
+  }>;
+  teamMembers: Array<{
+    id: string;
+    name: string;
+    role: string;
+    avatar: string;
+  }>;
+  invoices: Array<{
+    id: string;
+    client: string;
+    amount: number;
+    status: string;
+    date: string;
+  }>;
+  analytics: {
+    totalRevenue: number;
+    activeEvents: number;
+    totalGuests: number;
+    conversionRate: number;
+  };
+};
+
+export const dashboardApi = {
+  // Get couple dashboard
+  getCoupleDashboard: () =>
+    api.get<{ success: boolean; data: CoupleDashboardData }>("/dashboard/couple"),
+
+  // Get business dashboard
+  getBusinessDashboard: () =>
+    api.get<{ success: boolean; data: BusinessDashboardData }>("/dashboard/business"),
+
+  // Send RSVP reminders
+  sendReminders: (eventId: string, data?: { type?: string; message?: string }) =>
+    api.post<{ success: boolean; sent: number }>(`/events/${eventId}/reminders`, data),
+};
+
+// ====================
+// Checklist API
+// ====================
+
+export const checklistApi = {
+  // Get all items
+  getItems: () =>
+    api.get<{ success: boolean; items: Array<{ id: string; text: string; completed: boolean; category: string }> }>("/checklist"),
+
+  // Create item
+  createItem: (text: string, category?: string) =>
+    api.post<{ success: boolean; item: { id: string; text: string; completed: boolean } }>("/checklist", { text, category }),
+
+  // Update item (toggle completion)
+  updateItem: (id: string, data: { completed?: boolean; text?: string }) =>
+    api.put<{ success: boolean; item: { id: string; text: string; completed: boolean } }>(`/checklist/${id}`, data),
+
+  // Delete item
+  deleteItem: (id: string) =>
+    api.delete<{ success: boolean }>(`/checklist/${id}`),
+};
+
+// ====================
+// Extended Auth API
+// ====================
+
+export const authApiExtended = {
+  // Resend magic link
+  resendMagicLink: (email: string) =>
+    api.post<{ success: boolean; message: string }>("/auth/resend-magic-link", { email }),
+
+  // Resend verification email
+  resendVerification: (email: string) =>
+    api.post<{ success: boolean; message: string }>("/auth/resend-verification", { email }),
+};
+
 export default api;

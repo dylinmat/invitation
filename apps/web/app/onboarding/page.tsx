@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { showToast } from "@/components/ui/toaster";
 import { useAuth } from "@/hooks/useAuth";
+import { userApi } from "@/lib/api";
 import {
   Heart,
   Briefcase,
@@ -102,11 +103,20 @@ export default function OnboardingPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Call API to update user organization type
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const payload: any = { type: userType };
+
+      if (userType === "COUPLE") {
+        payload.coupleNames = coupleNames;
+        payload.eventDate = eventDate || undefined;
+      } else {
+        payload.businessName = businessName;
+        payload.website = website || undefined;
+        payload.businessType = userType;
+      }
+
+      await userApi.completeOnboarding(payload);
       
       if (userType === "COUPLE") {
-        // Couples can start with free plan immediately
         showToast({
           title: "Welcome! 🎉",
           description: "Your event space is ready!",
@@ -114,13 +124,13 @@ export default function OnboardingPage() {
         });
         router.push("/dashboard/couple");
       } else {
-        // Professionals see plan selection
         setStep("plan");
       }
     } catch (error) {
+      console.error("Onboarding error:", error);
       showToast({
-        title: "Something went wrong",
-        description: "Please try again.",
+        title: "Failed to save",
+        description: "Please try again or contact support.",
         variant: "destructive",
       });
     } finally {
@@ -132,8 +142,7 @@ export default function OnboardingPage() {
     setIsLoading(true);
     
     try {
-      // TODO: Call API to set plan
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await userApi.updatePlan(selectedPlan as "FREE" | "STARTER" | "PROFESSIONAL");
       
       showToast({
         title: "Welcome to EIOS Pro!",
@@ -143,8 +152,9 @@ export default function OnboardingPage() {
       
       router.push("/dashboard/business");
     } catch (error) {
+      console.error("Plan selection error:", error);
       showToast({
-        title: "Something went wrong",
+        title: "Failed to set plan",
         description: "Please try again.",
         variant: "destructive",
       });
