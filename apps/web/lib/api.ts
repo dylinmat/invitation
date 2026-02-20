@@ -722,6 +722,22 @@ export type UserOrganization = {
 export const userApi = {
   getUserOrganizations: () =>
     api.get<UserOrganization[]>("/auth/me/organizations"),
+  
+  // Complete onboarding
+  completeOnboarding: (data: OnboardingData) =>
+    api.post<{ success: boolean; organization: Organization }>("/users/onboarding", data),
+
+  // Update selected plan
+  updatePlan: (plan: "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE") =>
+    api.put<{ success: boolean; plan: string }>("/users/plan", { plan }),
+
+  // Get organization
+  getOrganization: () =>
+    api.get<{ success: boolean; organization: Organization }>("/users/me/organization"),
+
+  // Get current user with org
+  getMe: () =>
+    api.get<{ success: boolean; user: User & { organizationId?: string; orgType?: string; onboardingCompleted?: boolean } }>("/users/me"),
 };
 
 // ====================
@@ -796,10 +812,7 @@ export const teamApi = {
     api.post<void>(`/organizations/invites/${token}/decline`),
 };
 
-// ====================
-// User & Onboarding API
-// ====================
-
+// Types for User & Onboarding (merged into userApi above)
 export type Organization = {
   id: string;
   type: "COUPLE" | "PLANNER" | "VENUE";
@@ -817,24 +830,6 @@ export type OnboardingData = {
   businessName?: string;
   website?: string;
   businessType?: "PLANNER" | "VENUE" | "VENDOR";
-};
-
-export const userApi = {
-  // Complete onboarding
-  completeOnboarding: (data: OnboardingData) =>
-    api.post<{ success: boolean; organization: Organization }>("/users/onboarding", data),
-
-  // Update selected plan
-  updatePlan: (plan: "FREE" | "STARTER" | "PROFESSIONAL" | "ENTERPRISE") =>
-    api.put<{ success: boolean; plan: string }>("/users/plan", { plan }),
-
-  // Get organization
-  getOrganization: () =>
-    api.get<{ success: boolean; organization: Organization }>("/users/me/organization"),
-
-  // Get current user with org
-  getMe: () =>
-    api.get<{ success: boolean; user: User & { organizationId?: string; orgType?: string; onboardingCompleted?: boolean } }>("/users/me"),
 };
 
 // ====================
