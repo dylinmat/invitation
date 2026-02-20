@@ -56,7 +56,7 @@ const plans = [
       "Guest messaging",
       "Photo gallery",
     ],
-    cta: "Start Free Trial",
+    cta: "Select Plan",
     popular: true,
   },
   {
@@ -74,7 +74,7 @@ const plans = [
       "Priority support",
       "API access",
     ],
-    cta: "Start Free Trial",
+    cta: "Select Plan",
     popular: false,
   },
 ];
@@ -146,7 +146,7 @@ export default function OnboardingPage() {
       
       showToast({
         title: "Welcome to EIOS Pro!",
-        description: "Your 14-day trial starts now.",
+        description: "Your account is ready.",
         variant: "success",
       });
       
@@ -301,7 +301,7 @@ export default function OnboardingPage() {
                   </li>
                 </ul>
                 <div className="mt-6 flex items-center text-[#8B6B5D] font-medium group-hover:gap-2 transition-all">
-                  Start free trial
+                  Get started free
                   <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
                 </div>
               </motion.button>
@@ -446,7 +446,7 @@ export default function OnboardingPage() {
                   </>
                 ) : (
                   <>
-                    Continue to Plans
+                    Continue
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </>
                 )}
@@ -470,10 +470,10 @@ export default function OnboardingPage() {
 
             <div className="text-center mb-12">
               <h1 className="text-3xl font-bold text-[#2C1810] mb-2">
-                Choose your plan
+                Select your plan
               </h1>
               <p className="text-muted-foreground">
-                Start with a 14-day free trial. No credit card required.
+                Choose the plan that fits your needs. Upgrade or downgrade anytime.
               </p>
             </div>
 

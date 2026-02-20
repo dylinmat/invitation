@@ -272,7 +272,7 @@ export default function RegisterPage() {
                     Create your account
                   </h1>
                   <p className="text-muted-foreground">
-                    Start your 14-day free trial. No credit card required.
+                    Get started for free. Upgrade anytime for more features.
                   </p>
                 </div>
 
@@ -477,7 +477,7 @@ export default function RegisterPage() {
                       <Check className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium text-[#2C1810]">Free 14-day trial</p>
+                      <p className="font-medium text-[#2C1810]">Free forever</p>
                       <p className="text-xs text-muted-foreground">
                         All features included. Cancel anytime.
                       </p>
