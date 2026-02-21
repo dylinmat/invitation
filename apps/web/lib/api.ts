@@ -954,4 +954,312 @@ export const authApiExtended = {
     api.post<{ success: boolean; message: string }>("/auth/resend-verification", { email }),
 };
 
+// ====================
+// Events API (Business Events)
+// ====================
+
+export type BusinessEvent = {
+  id: string;
+  orgId: string;
+  name: string;
+  type: string;
+  date: string;
+  location?: string;
+  description?: string;
+  status: "draft" | "confirmed" | "completed" | "cancelled";
+  guestCount: number;
+  revenue: number;
+  clientId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const eventsApi = {
+  // List events
+  list: (params?: { page?: number; limit?: number; status?: string; clientId?: string }) =>
+    api.get<{ events: BusinessEvent[]; total: number }>("/events", params),
+
+  // Get event by ID
+  get: (id: string) => api.get<BusinessEvent>(`/events/${id}`),
+
+  // Create event
+  create: (data: {
+    name: string;
+    type: string;
+    date: string;
+    location?: string;
+    description?: string;
+    clientId?: string;
+  }) => api.post<BusinessEvent>("/events", data),
+
+  // Update event
+  update: (id: string, data: Partial<BusinessEvent>) =>
+    api.patch<BusinessEvent>(`/events/${id}`, data),
+
+  // Delete event
+  delete: (id: string) => api.delete<void>(`/events/${id}`),
+};
+
+// ====================
+// Clients API
+// ====================
+
+export type Client = {
+  id: string;
+  orgId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  type: "couple" | "corporate" | "individual";
+  status: "active" | "inactive" | "archived";
+  notes?: string;
+  address?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const clientsApi = {
+  // List clients
+  list: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+    api.get<{ clients: Client[]; total: number }>("/clients", params),
+
+  // Get client by ID
+  get: (id: string) => api.get<Client>(`/clients/${id}`),
+
+  // Create client
+  create: (data: {
+    name: string;
+    email: string;
+    phone?: string;
+    type: "couple" | "corporate" | "individual";
+    notes?: string;
+    address?: string;
+  }) => api.post<Client>("/clients", data),
+
+  // Update client
+  update: (id: string, data: Partial<Client>) =>
+    api.patch<Client>(`/clients/${id}`, data),
+
+  // Delete client
+  delete: (id: string) => api.delete<void>(`/clients/${id}`),
+};
+
+// ====================
+// Invoices API
+// ====================
+
+export type Invoice = {
+  id: string;
+  orgId: string;
+  clientId: string;
+  clientName: string;
+  amount: number;
+  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+  dueDate: string;
+  sentAt?: string;
+  paidAt?: string;
+  items: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const invoicesApi = {
+  // List invoices
+  list: (params?: { page?: number; limit?: number; status?: string; clientId?: string }) =>
+    api.get<{ invoices: Invoice[]; total: number }>("/invoices", params),
+
+  // Get invoice by ID
+  get: (id: string) => api.get<Invoice>(`/invoices/${id}`),
+
+  // Create invoice
+  create: (data: {
+    clientId: string;
+    amount: number;
+    dueDate: string;
+    items: Array<{
+      description: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+    notes?: string;
+  }) => api.post<Invoice>("/invoices", data),
+
+  // Update invoice
+  update: (id: string, data: Partial<Invoice>) =>
+    api.patch<Invoice>(`/invoices/${id}`, data),
+
+  // Delete invoice
+  delete: (id: string) => api.delete<void>(`/invoices/${id}`),
+
+  // Send invoice
+  send: (id: string) =>
+    api.post<{ success: boolean; sentAt: string }>(`/invoices/${id}/send`),
+
+  // Mark as paid
+  markPaid: (id: string) =>
+    api.post<{ success: boolean; paidAt: string }>(`/invoices/${id}/mark-paid`),
+
+  // Cancel invoice
+  cancel: (id: string) =>
+    api.post<{ success: boolean }>(`/invoices/${id}/cancel`),
+};
+
+// ====================
+// Team Invites API (Extended)
+// ====================
+
+export type PendingInvite = {
+  id: string;
+  email: string;
+  role: TeamRole;
+  invitedBy: string;
+  invitedAt: string;
+  expiresAt: string;
+  status: "pending" | "accepted" | "expired" | "cancelled";
+};
+
+export const teamInvitesApi = {
+  // Get pending invites
+  getPendingInvites: (orgId: string) =>
+    api.get<{ invites: PendingInvite[] }>(`/organizations/${orgId}/invites/pending`),
+
+  // Resend invite
+  resendInvite: (orgId: string, inviteId: string) =>
+    api.post<{ success: boolean }>(`/organizations/${orgId}/invites/${inviteId}/resend`),
+
+  // Cancel invite
+  cancelInvite: (orgId: string, inviteId: string) =>
+    api.post<{ success: boolean }>(`/organizations/${orgId}/invites/${inviteId}/cancel`),
+};
+
+// ====================
+// Import API
+// ====================
+
+export type ImportResult = {
+  success: boolean;
+  imported: number;
+  totalRows?: number;
+  validRows?: number;
+  invalidRows?: number;
+  duplicates?: number;
+  errors: string[];
+  warnings: string[];
+  duplicateDetails?: Array<{
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  }>;
+  failedRows?: Array<{
+    row: Record<string, string>;
+    rowNumber: number;
+    errors: string[];
+  }>;
+};
+
+export type ImportPreviewResult = {
+  success: boolean;
+  preview?: Record<string, string>[];
+  totalRows?: number;
+  headers?: string[];
+  validation?: {
+    headers: {
+      valid: boolean;
+      errors: string[];
+      warnings: string[];
+    };
+    rows: {
+      valid: boolean;
+      errors: string[];
+      warnings: string[];
+    };
+  };
+};
+
+export const importApi = {
+  // Import CSV file
+  importCSV: (file: File, type: "guests" | "clients", contextId: string, options?: {
+    skipDuplicates?: boolean;
+    skipValidation?: boolean;
+  }) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+    
+    if (type === "guests") {
+      formData.append("projectId", contextId);
+    } else {
+      formData.append("organizationId", contextId);
+    }
+    
+    if (options?.skipDuplicates) {
+      formData.append("skipDuplicates", "true");
+    }
+    if (options?.skipValidation) {
+      formData.append("skipValidation", "true");
+    }
+
+    return request<ImportResult>("/import/csv", {
+      method: "POST",
+      body: formData as unknown as Record<string, unknown>,
+      headers: {}, // Let browser set content-type for FormData
+    });
+  },
+
+  // Preview CSV without importing
+  previewCSV: (file: File, type: "guests" | "clients") => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+
+    return request<ImportPreviewResult>("/import/preview", {
+      method: "POST",
+      body: formData as unknown as Record<string, unknown>,
+      headers: {},
+    });
+  },
+
+  // Download CSV template
+  downloadTemplate: async (type: "guests" | "clients") => {
+    const response = await fetch(
+      `${API_BASE_URL}/import/template/${type}`,
+      {
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Failed to download template");
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = type === "guests" ? "guests_template.csv" : "clients_template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Get template content
+  getTemplateContent: (type: "guests" | "clients") =>
+    api.get<{
+      success: boolean;
+      headers?: string[];
+      exampleRows?: Record<string, string>[];
+    }>(`/import/template-content/${type}`),
+};
+
 export default api;

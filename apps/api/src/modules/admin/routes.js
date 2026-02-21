@@ -227,6 +227,4 @@ async function adminRoutes(fastify, opts) {
   fastify.log.info("Admin routes registered");
 }
 
-module.exports = {
-  adminRoutes
-};
+module.exports = adminRoutes;

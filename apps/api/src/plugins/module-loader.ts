@@ -106,23 +106,31 @@ async function loadModule(
     delete require.cache[entryPoint];
   }
   
-  const module = require(entryPoint) as ModuleDefinition;
+  const module = require(entryPoint) as ModuleDefinition | FastifyPluginAsync;
   
-  validateModule(module, moduleName);
+  const prefix = options.prefix ?? `/${moduleName}`;
   
-  const prefix = options.prefix ?? module.prefix ?? `/${moduleName}`;
-  
-  if (module.register) {
-    await fastify.register(module.register, { prefix, ...options });
-  } else if (module.routes) {
-    await fastify.register(async (instance) => {
-      for (const route of module.routes || []) {
-        instance.route(route);
-      }
-    }, { prefix, ...options });
+  // Handle different export patterns
+  if (typeof module === "function") {
+    // Direct function export - use as Fastify plugin
+    await fastify.register(module as FastifyPluginAsync, { prefix });
+  } else if (typeof module === "object" && module !== null) {
+    validateModule(module, moduleName);
+    
+    if (module.register) {
+      await fastify.register(module.register, { prefix, ...options });
+    } else if (module.routes) {
+      await fastify.register(async (instance) => {
+        for (const route of module.routes || []) {
+          instance.route(route);
+        }
+      }, { prefix, ...options });
+    }
+  } else {
+    throw new Error(`Module "${moduleName}" must export a function or an object with register/routes`);
   }
   
-  fastify.log.info(`Module loaded: ${module.name || moduleName} (prefix: ${prefix})`);
+  fastify.log.info(`Module loaded: ${(module as ModuleDefinition).name || moduleName} (prefix: ${prefix})`);
   
   return true;
 }

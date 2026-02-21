@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { 
@@ -19,36 +20,67 @@ import {
   Star
 } from "lucide-react";
 
+// Professional wedding/event photos from Unsplash
+const PHOTOS = {
+  hero: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=80",
+  invitation: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=800&q=80",
+  rsvp: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&q=80",
+  gallery: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800&q=80",
+  couple1: "https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=200&q=80",
+  couple2: "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?w=200&q=80",
+  couple3: "https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=200&q=80",
+  weddingReception: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=400&q=80",
+  birthdayParty: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&q=80",
+  gardenCeremony: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=400&q=80",
+  beachCelebration: "https://images.unsplash.com/photo-1544592744-5c58706191d1?w=400&q=80",
+  babyShower: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&q=80",
+  anniversary: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80",
+  graduation: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&q=80",
+  engagement: "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?w=400&q=80",
+  step1: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80",
+  step2: "https://images.unsplash.com/photo-1561336313-0bd5e0b27ec8?w=600&q=80",
+  step3: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=600&q=80",
+  testimonial1: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&q=80",
+  testimonial2: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80",
+  testimonial3: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&q=80",
+};
+
 const features = [
   {
     icon: Send,
     title: "Send Anywhere",
-    description: "Email or text invitations instantly. Guests receive beautifully formatted invites on any device."
+    description: "Email or text invitations instantly. Guests receive beautifully formatted invites on any device.",
+    image: PHOTOS.invitation
   },
   {
     icon: CheckCircle2,
     title: "Track RSVPs",
-    description: "See who's coming in real-time. Automatic reminders for guests who haven't responded."
+    description: "See who's coming in real-time. Automatic reminders for guests who haven't responded.",
+    image: PHOTOS.rsvp
   },
   {
     icon: Users,
     title: "Guest Management",
-    description: "Import contacts, manage plus-ones, dietary restrictions, and seating arrangements."
+    description: "Import contacts, manage plus-ones, dietary restrictions, and seating arrangements.",
+    image: PHOTOS.gallery
   },
   {
     icon: MessageSquare,
     title: "Stay Connected",
-    description: "Send updates, reminders, and thank you messages to all guests or specific groups."
+    description: "Send updates, reminders, and thank you messages to all guests or specific groups.",
+    image: PHOTOS.beachCelebration
   },
   {
     icon: BarChart3,
     title: "Insights & Reports",
-    description: "Export guest lists, meal preferences, and attendance reports anytime."
+    description: "Export guest lists, meal preferences, and attendance reports anytime.",
+    image: PHOTOS.step1
   },
   {
     icon: Bell,
     title: "Smart Reminders",
-    description: "Automatic RSVP reminders and event countdowns for you and your guests."
+    description: "Automatic RSVP reminders and event countdowns for you and your guests.",
+    image: PHOTOS.engagement
   }
 ];
 
@@ -56,17 +88,20 @@ const howItWorks = [
   {
     step: "1",
     title: "Import Your Guests",
-    description: "Upload from spreadsheet or add contacts manually. We organize everything for you."
+    description: "Upload from spreadsheet or add contacts manually. We organize everything for you.",
+    image: PHOTOS.step1
   },
   {
     step: "2",
     title: "Send Invitations",
-    description: "Choose email or SMS. Deliver instantly or schedule for later."
+    description: "Choose email or SMS. Deliver instantly or schedule for later.",
+    image: PHOTOS.step2
   },
   {
     step: "3",
     title: "Track Everything",
-    description: "Watch RSVPs roll in, manage responses, and communicate with guests—all in one place."
+    description: "Watch RSVPs roll in, manage responses, and communicate with guests—all in one place.",
+    image: PHOTOS.step3
   }
 ];
 
@@ -76,22 +111,43 @@ const testimonials = [
     author: "Sarah Mitchell",
     event: "Wedding",
     stat: "150 guests",
-    image: "bg-rose-100"
+    image: PHOTOS.testimonial1,
+    avatar: PHOTOS.couple1
   },
   {
     quote: "The automatic reminders were a lifesaver. No more awkward follow-ups with friends who forgot to RSVP.",
     author: "Michael Torres",
     event: "40th Birthday",
     stat: "89% response",
-    image: "bg-amber-100"
+    image: PHOTOS.testimonial2,
+    avatar: PHOTOS.couple2
   },
   {
     quote: "Managing plus-ones and dietary restrictions was so easy. The guest list practically organized itself.",
     author: "Emma & David",
     event: "Baby Shower",
     stat: "45 guests",
-    image: "bg-green-100"
+    image: PHOTOS.testimonial3,
+    avatar: PHOTOS.couple3
   }
+];
+
+const eventTypes = [
+  { label: "Weddings", image: PHOTOS.weddingReception },
+  { label: "Birthdays", image: PHOTOS.birthdayParty },
+  { label: "Baby Showers", image: PHOTOS.babyShower },
+  { label: "Dinner Parties", image: PHOTOS.anniversary }
+];
+
+const galleryPhotos = [
+  { image: PHOTOS.weddingReception, label: "Wedding Reception" },
+  { image: PHOTOS.birthdayParty, label: "Birthday Party" },
+  { image: PHOTOS.gardenCeremony, label: "Garden Ceremony" },
+  { image: PHOTOS.beachCelebration, label: "Beach Celebration" },
+  { image: PHOTOS.babyShower, label: "Baby Shower" },
+  { image: PHOTOS.anniversary, label: "Anniversary Dinner" },
+  { image: PHOTOS.graduation, label: "Graduation Party" },
+  { image: PHOTOS.engagement, label: "Engagement Party" }
 ];
 
 export default function LandingPage() {
@@ -184,14 +240,15 @@ export default function LandingPage() {
             {/* Hero Image - Wedding/Event Photo */}
             <div className="relative">
               <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                {/* Placeholder for real wedding/event photo */}
-                <div className="aspect-[4/3] bg-gradient-to-br from-rose-100 to-amber-50 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <Heart className="w-16 h-16 text-rose-300 mx-auto mb-4" />
-                    <p className="font-serif text-2xl text-rose-800 mb-2">Your Event Photo</p>
-                    <p className="text-rose-600 text-sm">Beautiful celebration moments</p>
-                  </div>
-                </div>
+                <Image
+                  src={PHOTOS.hero}
+                  alt="Beautiful wedding celebration with couple at sunset"
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto object-cover"
+                  priority
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                 {/* Overlay Stats */}
                 <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-lg">
                   <div className="grid grid-cols-3 gap-4 text-center">
@@ -220,17 +277,18 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <p className="text-center text-stone-500 text-sm uppercase tracking-wider mb-8">Perfect for any occasion</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: "Weddings", color: "bg-rose-100", icon: Heart },
-              { label: "Birthdays", color: "bg-amber-100", icon: Calendar },
-              { label: "Baby Showers", color: "bg-green-100", icon: Heart },
-              { label: "Dinner Parties", color: "bg-blue-100", icon: Heart },
-            ].map((event, i) => (
-              <div key={i} className={`${event.color} rounded-xl aspect-[4/3] flex flex-col items-center justify-center p-4`}>
-                <event.icon className="w-8 h-8 text-stone-400 mb-2" />
-                <span className="font-medium text-stone-700">{event.label}</span>
-                {/* Placeholder for actual event photos */}
-                <span className="text-xs text-stone-500 mt-1">Photo placeholder</span>
+            {eventTypes.map((event, i) => (
+              <div key={i} className="relative rounded-xl aspect-[4/3] overflow-hidden group cursor-pointer">
+                <Image
+                  src={event.image}
+                  alt={`${event.label} celebration`}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-4">
+                  <span className="font-medium text-white">{event.label}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -249,12 +307,23 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, i) => (
-              <div key={i} className="bg-white rounded-2xl p-8 border border-stone-100 hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-rose-600" />
+              <div key={i} className="bg-white rounded-2xl overflow-hidden border border-stone-100 hover:shadow-lg transition-all duration-300 group">
+                <div className="h-48 overflow-hidden">
+                  <Image
+                    src={feature.image}
+                    alt={`${feature.title} feature`}
+                    width={400}
+                    height={200}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
                 </div>
-                <h3 className="font-serif text-xl text-stone-900 mb-2">{feature.title}</h3>
-                <p className="text-stone-600 text-sm leading-relaxed">{feature.description}</p>
+                <div className="p-8">
+                  <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4">
+                    <feature.icon className="w-6 h-6 text-rose-600" />
+                  </div>
+                  <h3 className="font-serif text-xl text-stone-900 mb-2">{feature.title}</h3>
+                  <p className="text-stone-600 text-sm leading-relaxed">{feature.description}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -270,20 +339,22 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { step: "1", title: "Import Your Guests", desc: "Upload from spreadsheet or add contacts manually.", image: "bg-blue-50" },
-              { step: "2", title: "Send Beautiful Invites", desc: "Choose email or SMS. Schedule or send instantly.", image: "bg-rose-50" },
-              { step: "3", title: "Track & Celebrate", desc: "Watch RSVPs arrive and enjoy your event.", image: "bg-amber-50" },
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className={`${item.image} rounded-2xl aspect-video mb-6 flex items-center justify-center`}>
-                  <span className="text-stone-400 text-sm">Step {item.step} Image</span>
+            {howItWorks.map((item, i) => (
+              <div key={i} className="text-center group">
+                <div className="relative rounded-2xl aspect-video mb-6 overflow-hidden shadow-lg">
+                  <Image
+                    src={item.image}
+                    alt={`Step ${item.step}: ${item.title}`}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                 </div>
                 <div className="w-10 h-10 bg-stone-900 text-white rounded-full flex items-center justify-center text-lg font-serif mx-auto mb-4">
                   {item.step}
                 </div>
                 <h3 className="font-serif text-xl text-stone-900 mb-2">{item.title}</h3>
-                <p className="text-stone-600 text-sm">{item.desc}</p>
+                <p className="text-stone-600 text-sm">{item.description}</p>
               </div>
             ))}
           </div>
@@ -300,17 +371,33 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {testimonials.map((t, i) => (
-              <div key={i} className="bg-stone-800/50 rounded-2xl overflow-hidden border border-stone-700">
-                {/* Photo Placeholder */}
-                <div className={`${t.image} h-48 flex items-center justify-center`}>
-                  <span className="text-stone-500 text-sm font-medium">{t.author}&apos;s {t.event}</span>
+              <div key={i} className="bg-stone-800/50 rounded-2xl overflow-hidden border border-stone-700 group">
+                {/* Photo */}
+                <div className="relative h-48 overflow-hidden">
+                  <Image
+                    src={t.image}
+                    alt={`${t.author}'s ${t.event}`}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 to-transparent" />
                 </div>
                 <div className="p-6">
                   <p className="text-stone-300 mb-4 leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-white">{t.author}</p>
-                      <p className="text-sm text-stone-400">{t.event}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-10 w-10 rounded-full overflow-hidden border-2 border-rose-500">
+                        <Image
+                          src={t.avatar}
+                          alt={t.author}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">{t.author}</p>
+                        <p className="text-sm text-stone-400">{t.event}</p>
+                      </div>
                     </div>
                     <span className="text-xs bg-rose-600 text-white px-3 py-1 rounded-full">{t.stat}</span>
                   </div>
@@ -331,19 +418,18 @@ export default function LandingPage() {
           
           {/* Photo Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { color: "bg-rose-100", label: "Wedding Reception" },
-              { color: "bg-amber-100", label: "Birthday Party" },
-              { color: "bg-green-100", label: "Garden Ceremony" },
-              { color: "bg-blue-100", label: "Beach Celebration" },
-              { color: "bg-purple-100", label: "Baby Shower" },
-              { color: "bg-orange-100", label: "Anniversary Dinner" },
-              { color: "bg-teal-100", label: "Graduation Party" },
-              { color: "bg-pink-100", label: "Engagement Party" },
-            ].map((photo, i) => (
-              <div key={i} className={`${photo.color} rounded-xl aspect-square flex flex-col items-center justify-center p-4 hover:scale-105 transition-transform cursor-pointer`}>
-                <Heart className="w-8 h-8 text-stone-400 mb-2" />
-                <span className="text-xs text-stone-600 text-center font-medium">{photo.label}</span>
+            {galleryPhotos.map((photo, i) => (
+              <div key={i} className="relative rounded-xl aspect-square overflow-hidden group cursor-pointer">
+                <Image
+                  src={photo.image}
+                  alt={photo.label}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <span className="text-white text-sm font-medium text-center px-2">{photo.label}</span>
+                </div>
               </div>
             ))}
           </div>

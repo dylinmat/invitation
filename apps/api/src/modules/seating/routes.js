@@ -383,6 +383,4 @@ const handleSeatingRoutes = async (req, res, body, reqInfo) => {
   }
 };
 
-module.exports = {
-  handleSeatingRoutes
-};
+module.exports = handleSeatingRoutes;

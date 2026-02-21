@@ -30,7 +30,7 @@ const nextConfig = {
   },
   
   // Disable static export for all pages
-  trailingSlash: true,
+  trailingSlash: false,
   
   // Webpack configuration to fix chunk caching issues
   webpack: (config, { isServer }) => {
@@ -102,14 +102,23 @@ const nextConfig = {
     ];
   },
   
+  // Rewrites - proxy API requests to internal API server
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:4000/api/:path*',
+      },
+      {
+        source: '/health',
+        destination: 'http://localhost:4000/health',
+      },
+    ];
+  },
+  
   // Redirects
   async redirects() {
     return [
-      {
-        source: '/health',
-        destination: '/api/health',
-        permanent: true,
-      },
       {
         source: '/ready',
         destination: '/api/ready',

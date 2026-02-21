@@ -1,312 +1,334 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Save, Share, Eye, Settings, Undo, Redo } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { useCollaborativeMap, useCollaborativeCursors, usePresence } from "@/hooks/useRealtime";
+import { useState, useCallback, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2 } from "lucide-react";
+import { useSiteContent } from "@/hooks/useSite";
+import { Canvas, Toolbar, Sidebar, PropertiesPanel } from "@/components/editor";
+import type { Section } from "@/components/editor/types";
+import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/useToast";
 
-// This is a stub implementation for the visual editor
-// The actual Konva integration would be implemented here
+// Keyboard shortcuts
+function useKeyboardShortcuts({
+  onSave,
+  onUndo,
+  onRedo,
+  onPreviewToggle,
+  canUndo,
+  canRedo,
+}: {
+  onSave: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onPreviewToggle: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + S - Save
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        onSave();
+      }
+
+      // Ctrl/Cmd + Z - Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) onUndo();
+      }
+
+      // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z - Redo
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === "y") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "z")
+      ) {
+        e.preventDefault();
+        if (canRedo) onRedo();
+      }
+
+      // Ctrl/Cmd + P - Preview
+      if ((e.ctrlKey || e.metaKey) && e.key === "p") {
+        e.preventDefault();
+        onPreviewToggle();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onSave, onUndo, onRedo, onPreviewToggle, canUndo, canRedo]);
+}
 
 export default function EditorPage() {
   const params = useParams();
   const siteId = params.siteId as string;
+  const { toast } = useToast();
 
-  // Real-time collaboration hooks
-  const { data: sceneData, setValue: setSceneValue } = useCollaborativeMap(
-    `site-${siteId}`,
-    "scene"
+  // Editor state
+  const [previewMode, setPreviewMode] = useState(false);
+  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+
+  // Site content hook
+  const {
+    content,
+    isLoading,
+    error,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    isSaving,
+    saveError,
+    saveNow,
+    publish,
+    unpublish,
+    isPublishing,
+    addSection,
+    removeSection,
+    updateSectionProps,
+    reorderSections,
+    updateTheme,
+    updateSettings,
+  } = useSiteContent(siteId);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSave: saveNow,
+    onUndo: undo,
+    onRedo: redo,
+    onPreviewToggle: () => setPreviewMode((prev) => !prev),
+    canUndo,
+    canRedo,
+  });
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error loading site",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
+  useEffect(() => {
+    if (saveError) {
+      toast({
+        title: "Save failed",
+        description: saveError.message,
+        variant: "destructive",
+      });
+    }
+  }, [saveError, toast]);
+
+  // Handlers
+  const handleAddSection = useCallback(
+    (type: Section["type"]) => {
+      const newSectionId = addSection(type);
+      setSelectedSectionId(newSectionId);
+      toast({
+        title: "Section added",
+        description: `Added ${type} section to your page`,
+      });
+    },
+    [addSection, toast]
   );
-  const { cursors, updateCursor } = useCollaborativeCursors(`site-${siteId}`);
-  const users = usePresence(`site-${siteId}`, { name: "You", color: "#3b82f6" });
 
-  return (
-    <TooltipProvider>
-      <div className="h-screen flex flex-col bg-background">
-        {/* Editor Header */}
-        <header className="h-14 border-b flex items-center px-4 justify-between bg-background">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Separator orientation="vertical" className="h-6" />
-            <div>
-              <h1 className="font-semibold">Visual Editor</h1>
-              <p className="text-xs text-muted-foreground">Site ID: {siteId}</p>
-            </div>
-            <Badge variant="outline" className="ml-4">
-              Draft
-            </Badge>
-          </div>
+  const handleRemoveSection = useCallback(
+    (sectionId: string) => {
+      removeSection(sectionId);
+      if (selectedSectionId === sectionId) {
+        setSelectedSectionId(null);
+      }
+      toast({
+        title: "Section removed",
+        description: "The section has been deleted",
+      });
+    },
+    [removeSection, selectedSectionId, toast]
+  );
 
-          <div className="flex items-center gap-2">
-            {/* Undo/Redo */}
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon">
-                  <Undo className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Undo</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon">
-                  <Redo className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Redo</TooltipContent>
-            </Tooltip>
+  const handleMoveSection = useCallback(
+    (sectionId: string, direction: "up" | "down") => {
+      if (!content) return;
 
-            <Separator orientation="vertical" className="h-6 mx-2" />
+      const sections = [...content.sections].sort((a, b) => a.order - b.order);
+      const currentIndex = sections.findIndex((s) => s.id === sectionId);
 
-            {/* Online users indicator */}
-            {Array.from(users.entries()).length > 0 && (
-              <div className="flex items-center gap-1 mr-2">
-                <div className="flex -space-x-2">
-                  {Array.from(users.entries()).slice(0, 3).map(([id, user]) => (
-                    <div
-                      key={id}
-                      className="w-6 h-6 rounded-full border-2 border-background"
-                      style={{ backgroundColor: user.color }}
-                      title={user.name}
-                    />
-                  ))}
-                </div>
-                {users.size > 3 && (
-                  <span className="text-xs text-muted-foreground ml-1">
-                    +{users.size - 3}
-                  </span>
-                )}
-              </div>
-            )}
+      if (direction === "up" && currentIndex > 0) {
+        reorderSections(sectionId, sections[currentIndex - 1].id);
+      } else if (direction === "down" && currentIndex < sections.length - 1) {
+        reorderSections(sectionId, sections[currentIndex + 1].id);
+      }
+    },
+    [content, reorderSections]
+  );
 
-            <Button variant="outline" size="sm">
-              <Eye className="mr-2 h-4 w-4" />
-              Preview
-            </Button>
-            <Button variant="outline" size="sm">
-              <Share className="mr-2 h-4 w-4" />
-              Share
-            </Button>
-            <Button size="sm">
-              <Save className="mr-2 h-4 w-4" />
-              Publish
-            </Button>
-          </div>
-        </header>
+  const handlePublish = useCallback(() => {
+    publish(undefined, {
+      onSuccess: () => {
+        toast({
+          title: "Site published!",
+          description: "Your wedding website is now live",
+        });
+      },
+      onError: (err: any) => {
+        toast({
+          title: "Publish failed",
+          description: err.message,
+          variant: "destructive",
+        });
+      },
+    });
+  }, [publish, toast]);
 
-        {/* Editor Workspace */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar - Tools */}
-          <aside className="w-16 border-r bg-muted/30 flex flex-col items-center py-4 gap-2">
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon" className="rounded-lg">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                    />
-                  </svg>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Select</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon" className="rounded-lg">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Image</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon" className="rounded-lg">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Text</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon" className="rounded-lg">
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                    />
-                  </svg>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Shape</TooltipContent>
-            </Tooltip>
-            <Separator className="my-2" />
-            <Tooltip>
-              <TooltipTrigger>
-                <Button variant="ghost" size="icon" className="rounded-lg">
-                  <Settings className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
-          </aside>
+  const handleUnpublish = useCallback(() => {
+    unpublish?.(undefined, {
+      onSuccess: () => {
+        toast({
+          title: "Site unpublished",
+          description: "Your site is no longer visible to the public",
+        });
+      },
+    });
+  }, [unpublish, toast]);
 
-          {/* Canvas Area */}
-          <main className="flex-1 bg-muted/50 relative overflow-auto">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-white shadow-xl rounded-lg overflow-hidden" style={{ width: 800, height: 600 }}>
-                {/* This is where the Konva canvas would be mounted */}
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <p className="text-lg font-medium mb-2">Visual Editor Canvas</p>
-                    <p className="text-sm">Konva integration would be implemented here</p>
-                    <p className="text-xs mt-4 text-muted-foreground">
-                      Real-time collaboration active • {users.size + 1} users online
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </main>
+  // Get selected section
+  const selectedSection = selectedSectionId
+    ? content?.sections.find((s) => s.id === selectedSectionId) || null
+    : null;
 
-          {/* Right Sidebar - Properties */}
-          <aside className="w-72 border-l bg-background p-4">
-            <h3 className="font-semibold mb-4">Properties</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Position</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-muted-foreground">X</label>
-                    <input
-                      type="number"
-                      className="w-full h-9 px-3 rounded-md border bg-background text-sm"
-                      placeholder="0"
-                      readOnly
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Y</label>
-                    <input
-                      type="number"
-                      className="w-full h-9 px-3 rounded-md border bg-background text-sm"
-                      placeholder="0"
-                      readOnly
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Size</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-muted-foreground">Width</label>
-                    <input
-                      type="number"
-                      className="w-full h-9 px-3 rounded-md border bg-background text-sm"
-                      placeholder="100"
-                      readOnly
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Height</label>
-                    <input
-                      type="number"
-                      className="w-full h-9 px-3 rounded-md border bg-background text-sm"
-                      placeholder="100"
-                      readOnly
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Layer</label>
-                <select className="w-full h-9 px-3 rounded-md border bg-background text-sm">
-                  <option>Background</option>
-                  <option>Content</option>
-                  <option>Overlay</option>
-                </select>
-              </div>
-            </div>
+  // Calculate move availability
+  const sortedSections = content?.sections ? [...content.sections].sort((a, b) => a.order - b.order) : [];
+  const selectedIndex = selectedSectionId
+    ? sortedSections.findIndex((s) => s.id === selectedSectionId)
+    : -1;
+  const canMoveUp = selectedIndex > 0;
+  const canMoveDown = selectedIndex >= 0 && selectedIndex < sortedSections.length - 1;
 
-            <Separator className="my-6" />
-
-            <h3 className="font-semibold mb-4">Scene Graph</h3>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer">
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-                <span className="text-sm">Background Layer</span>
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer ml-4">
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-sm">Background Image</span>
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-primary/10 cursor-pointer">
-                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-sm font-medium">Title Text</span>
-              </div>
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer ml-4">
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-sm">Body Text</span>
-              </div>
-            </div>
-          </aside>
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading editor...</p>
         </div>
       </div>
-    </TooltipProvider>
+    );
+  }
+
+  // Error state
+  if (error || !content) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h1 className="text-xl font-semibold mb-2">Failed to load editor</h1>
+          <p className="text-muted-foreground mb-4">
+            {error?.message || "Unable to load site content. Please try again."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-primary hover:underline"
+          >
+            Reload page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      {/* Toolbar */}
+      <Toolbar
+        siteName={content.settings.title}
+        siteStatus="draft"
+        previewMode={previewMode}
+        device={device}
+        isSaving={isSaving}
+        saveError={saveError}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onPreviewToggle={() => setPreviewMode((prev) => !prev)}
+        onDeviceChange={setDevice}
+        onUndo={undo}
+        onRedo={redo}
+        onSave={saveNow}
+        onPublish={handlePublish}
+        onUnpublish={handleUnpublish}
+        isPublishing={isPublishing}
+        lastSaved={new Date()}
+      />
+
+      {/* Main Editor Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Hidden in preview mode */}
+        <AnimatePresence mode="popLayout">
+          {!previewMode && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 288, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0"
+            >
+              <Sidebar
+                sections={content.sections}
+                onAddSection={handleAddSection}
+                onSelectSection={setSelectedSectionId}
+                selectedSectionId={selectedSectionId}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Canvas */}
+        <Canvas
+          siteId={siteId}
+          content={content}
+          onChange={() => {}} // Handled internally via hooks
+          previewMode={previewMode}
+          device={device}
+          selectedSectionId={selectedSectionId}
+          onSelectSection={setSelectedSectionId}
+          onReorderSections={reorderSections}
+        />
+
+        {/* Right Sidebar - Properties Panel - Hidden in preview mode */}
+        <AnimatePresence mode="popLayout">
+          {!previewMode && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 320, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0"
+            >
+              <PropertiesPanel
+                section={selectedSection}
+                theme={content.theme}
+                onUpdateProps={updateSectionProps}
+                onUpdateSection={() => {}}
+                onRemoveSection={handleRemoveSection}
+                onMoveSection={handleMoveSection}
+                canMoveUp={canMoveUp}
+                canMoveDown={canMoveDown}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Toast notifications */}
+      <Toaster />
+    </div>
   );
 }

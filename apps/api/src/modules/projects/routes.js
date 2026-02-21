@@ -519,6 +519,4 @@ async function registerProjectsRoutes(fastify) {
   fastify.log.info("Projects routes registered");
 }
 
-module.exports = {
-  registerProjectsRoutes
-};
+module.exports = registerProjectsRoutes;

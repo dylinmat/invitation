@@ -7,7 +7,7 @@
  * - Project statistics and metadata
  */
 
-const { registerProjectsRoutes: projectRoutes } = require("./routes");
+const projectRoutes = require("./routes");
 
 // Export service methods for programmatic use
 const {

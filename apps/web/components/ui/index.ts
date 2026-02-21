@@ -1,5 +1,6 @@
 // UI Components
 export * from "./accordion";
+export * from "./alert-dialog";
 export * from "./avatar";
 export * from "./avatar-group";
 export * from "./badge";
@@ -26,6 +27,7 @@ export * from "./scroll-area";
 export * from "./select";
 export * from "./separator";
 export * from "./sheet";
+export * from "./slider";
 export * from "./skeleton";
 export * from "./stat-trend";
 export * from "./switch";

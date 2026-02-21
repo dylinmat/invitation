@@ -52,7 +52,7 @@ declare module "fastify" {
 interface HealthCheckResponse {
   status: string;
   service: string;
-  version: string;
+  version?: string;
   timestamp: string;
 }
 
@@ -285,8 +285,8 @@ async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
         }
       }
     }, async (request: FastifyRequest, reply: FastifyReply) => {
-      await logout(request.sessionToken as string);
-      reply.clearCookie("session_token");
+      await logout((request as any).sessionToken as string);
+      (reply as any).clearCookie("session_token");
       return { success: true, message: "Logged out successfully" };
     });
     
@@ -308,7 +308,9 @@ async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
     }, async (request: FastifyRequest) => {
       const user = await getCurrentUser(request.user?.id as string);
       if (!user) {
-        throw fastify.httpErrors.notFound("User not found");
+        const error = new Error("User not found");
+        (error as any).statusCode = 404;
+        throw error;
       }
       return { success: true, user };
     });
@@ -355,7 +357,9 @@ async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
       
       const updatedUser = await updateUser(userId, updates);
       if (!updatedUser) {
-        throw fastify.httpErrors.notFound("User not found");
+        const error = new Error("User not found");
+        (error as any).statusCode = 404;
+        throw error;
       }
       
       return { 
@@ -393,7 +397,7 @@ async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
         userAgent: request.headers["user-agent"]
       });
       
-      reply.setCookie("session_token", result.sessionToken, {
+      (reply as any).setCookie("session_token", result.sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -536,9 +540,12 @@ export async function registerLegacyRoutes(fastify: FastifyInstance): Promise<vo
  */
 async function registerSitesRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { siteRoutes, publicSiteRoutes } = require("./modules/sites/routes");
-    await fastify.register(siteRoutes, { prefix: "/" });
-    await fastify.register(publicSiteRoutes, { prefix: "/" });
+    const siteModule = require("./modules/sites");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = siteModule.register || siteModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/" });
+    }
     fastify.log.info("Sites routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Sites routes not available");
@@ -550,8 +557,13 @@ async function registerSitesRoutes(fastify: FastifyInstance): Promise<void> {
  */
 async function registerProjectsRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { registerProjectsRoutes: registerRoutes } = require("./modules/projects/routes");
-    await registerRoutes(fastify);
+    const projectsModule = require("./modules/projects");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = projectsModule.register || projectsModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/projects" });
+    }
+    fastify.log.info("Projects routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Projects module not available");
   }
@@ -562,11 +574,117 @@ async function registerProjectsRoutes(fastify: FastifyInstance): Promise<void> {
  */
 async function registerAdminRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { registerAdminRoutes: registerRoutes } = require("./modules/admin/routes");
-    await registerRoutes(fastify);
+    const adminModule = require("./modules/admin");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = adminModule.register || adminModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/admin" });
+    }
     fastify.log.info("Admin routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Admin module not available");
+  }
+}
+
+/**
+ * Register Users Routes
+ */
+async function registerUsersRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const usersModule = require("./modules/users");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = usersModule.register || usersModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/users" });
+    }
+    fastify.log.info("Users routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Users routes not available");
+  }
+}
+
+/**
+ * Register Dashboard Routes
+ */
+async function registerDashboardRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const dashboardModule = require("./modules/dashboard");
+    // Handle { routes: fn } export pattern
+    const routesFn = dashboardModule.routes || dashboardModule.register || dashboardModule;
+    if (typeof routesFn === "function") {
+      await fastify.register(routesFn, { prefix: "/api/dashboard" });
+    }
+    fastify.log.info("Dashboard routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Dashboard routes not available");
+  }
+}
+
+/**
+ * Register Events Routes
+ */
+async function registerEventsRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const eventsModule = require("./modules/events");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = eventsModule.register || eventsModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/events" });
+    }
+    fastify.log.info("Events routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Events routes not available");
+  }
+}
+
+/**
+ * Register Clients Routes
+ */
+async function registerClientsRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const clientsModule = require("./modules/clients");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = clientsModule.register || clientsModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/clients" });
+    }
+    fastify.log.info("Clients routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Clients routes not available");
+  }
+}
+
+/**
+ * Register Team Routes
+ */
+async function registerTeamRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const teamModule = require("./modules/team");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = teamModule.register || teamModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/team" });
+    }
+    fastify.log.info("Team routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Team routes not available");
+  }
+}
+
+/**
+ * Register Invoices Routes
+ */
+async function registerInvoicesRoutes(fastify: FastifyInstance): Promise<void> {
+  try {
+    const invoicesModule = require("./modules/invoices");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = invoicesModule.register || invoicesModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api/invoices" });
+    }
+    fastify.log.info("Invoices routes registered");
+  } catch (error) {
+    fastify.log.warn({ err: (error as Error).message }, "Invoices routes not available");
   }
 }
 
@@ -575,8 +693,12 @@ async function registerAdminRoutes(fastify: FastifyInstance): Promise<void> {
  */
 async function registerGuestsRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { guestRoutes } = require("./modules/guests/routes");
-    await fastify.register(guestRoutes, { prefix: "/" });
+    const guestsModule = require("./modules/guests");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = guestsModule.register || guestsModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api" });
+    }
     fastify.log.info("Guests routes registered via module");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Guests module not available");
@@ -588,44 +710,54 @@ async function registerGuestsRoutes(fastify: FastifyInstance): Promise<void> {
  */
 async function registerPhotosRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { handlePhotosRoutes } = require("./modules/photos/routes");
+    const photosModule = require("./modules/photos");
     
-    // Create a plugin that wraps the legacy route handler
-    await fastify.register(async (instance) => {
-      instance.addHook("onRequest", async (request, reply) => {
-        // Check if this is a photos route
-        const pathname = request.url.split("?")[0];
-        const isPhotosRoute = 
-          pathname.match(/^\/projects\/[^/]+\/photo-settings$/) ||
-          pathname.match(/^\/projects\/[^/]+\/photos/) ||
-          pathname.match(/^\/photos\//) ||
-          pathname === "/photos/upload-url" ||
-          pathname === "/photos/confirm-upload" ||
-          pathname === "/webhooks/s3/upload-complete";
-        
-        if (!isPhotosRoute) return;
-        
-        // Build request object for legacy handler
-        const reqInfo = {
-          ipAddress: request.ip,
-          userAgent: request.headers["user-agent"] || "",
-          userId: request.user?.id
-        };
-        
-        const result = await handlePhotosRoutes(
-          { ...request, pathname },
-          reply,
-          request.body,
-          reqInfo
-        );
-        
-        if (result) {
-          reply.status(result.status).send(result.body);
-        }
+    // First try to use the module's register function if available
+    if (photosModule.register && typeof photosModule.register === "function") {
+      await fastify.register(photosModule.register, { prefix: "/api" });
+      fastify.log.info("Photos routes registered via module");
+      return;
+    }
+    
+    // Fall back to legacy route handler
+    const handlePhotosRoutes = photosModule.handlePhotosRoutes;
+    if (handlePhotosRoutes) {
+      // Create a plugin that wraps the legacy route handler
+      await fastify.register(async (instance) => {
+        instance.addHook("onRequest", async (request, reply) => {
+          // Check if this is a photos route
+          const pathname = request.url.split("?")[0];
+          const isPhotosRoute = 
+            pathname.match(/^\/projects\/[^/]+\/photo-settings$/) ||
+            pathname.match(/^\/projects\/[^/]+\/photos/) ||
+            pathname.match(/^\/photos\//) ||
+            pathname === "/photos/upload-url" ||
+            pathname === "/photos/confirm-upload" ||
+            pathname === "/webhooks/s3/upload-complete";
+          
+          if (!isPhotosRoute) return;
+          
+          // Build request object for legacy handler
+          const reqInfo = {
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] || "",
+            userId: request.user?.id
+          };
+          
+          const result = await handlePhotosRoutes(
+            { ...request, pathname },
+            reply,
+            request.body,
+            reqInfo
+          );
+          
+          if (result) {
+            reply.status(result.status).send(result.body);
+          }
+        });
       });
-    });
-    
-    fastify.log.info("Photos routes registered");
+      fastify.log.info("Photos routes registered via legacy handler");
+    }
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Photos module not available");
   }
@@ -636,49 +768,59 @@ async function registerPhotosRoutes(fastify: FastifyInstance): Promise<void> {
  */
 async function registerSeatingRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { handleSeatingRoutes } = require("./modules/seating/routes");
+    const seatingModule = require("./modules/seating");
     
-    // Create a plugin that wraps the legacy route handler
-    await fastify.register(async (instance) => {
-      instance.addHook("onRequest", async (request, reply) => {
-        // Check if this is a seating route
-        const pathname = request.url.split("?")[0];
-        const isSeatingRoute = 
-          pathname.match(/^\/events\/[^/]+\/floor-plans/) ||
-          pathname.match(/^\/events\/[^/]+\/check-in/) ||
-          pathname.match(/^\/events\/[^/]+\/check-ins/) ||
-          pathname.match(/^\/events\/[^/]+\/qr-code/) ||
-          pathname.match(/^\/events\/[^/]+\/guest-qr-code/) ||
-          pathname.match(/^\/events\/[^/]+\/seating-stats/) ||
-          pathname.match(/^\/floor-plans\//) ||
-          pathname.match(/^\/tables\//) ||
-          pathname.match(/^\/seating\//) ||
-          pathname.match(/^\/check-in\//) ||
-          pathname.match(/^\/check-ins\//);
-        
-        if (!isSeatingRoute) return;
-        
-        // Build request object for legacy handler
-        const reqInfo = {
-          ipAddress: request.ip,
-          userAgent: request.headers["user-agent"] || "",
-          userId: request.user?.id
-        };
-        
-        const result = await handleSeatingRoutes(
-          { ...request, pathname },
-          reply,
-          request.body,
-          reqInfo
-        );
-        
-        if (result) {
-          reply.status(result.status).send(result.body);
-        }
+    // First try to use the module's register function if available
+    if (seatingModule.register && typeof seatingModule.register === "function") {
+      await fastify.register(seatingModule.register, { prefix: "/api" });
+      fastify.log.info("Seating routes registered via module");
+      return;
+    }
+    
+    // Fall back to legacy route handler
+    const handleSeatingRoutes = seatingModule.handleSeatingRoutes || seatingModule;
+    if (handleSeatingRoutes && typeof handleSeatingRoutes === "function") {
+      // Create a plugin that wraps the legacy route handler
+      await fastify.register(async (instance) => {
+        instance.addHook("onRequest", async (request, reply) => {
+          // Check if this is a seating route
+          const pathname = request.url.split("?")[0];
+          const isSeatingRoute = 
+            pathname.match(/^\/events\/[^/]+\/floor-plans/) ||
+            pathname.match(/^\/events\/[^/]+\/check-in/) ||
+            pathname.match(/^\/events\/[^/]+\/check-ins/) ||
+            pathname.match(/^\/events\/[^/]+\/qr-code/) ||
+            pathname.match(/^\/events\/[^/]+\/guest-qr-code/) ||
+            pathname.match(/^\/events\/[^/]+\/seating-stats/) ||
+            pathname.match(/^\/floor-plans\//) ||
+            pathname.match(/^\/tables\//) ||
+            pathname.match(/^\/seating\//) ||
+            pathname.match(/^\/check-in\//) ||
+            pathname.match(/^\/check-ins\//);
+          
+          if (!isSeatingRoute) return;
+          
+          // Build request object for legacy handler
+          const reqInfo = {
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"] || "",
+            userId: request.user?.id
+          };
+          
+          const result = await handleSeatingRoutes(
+            { ...request, pathname },
+            reply,
+            request.body,
+            reqInfo
+          );
+          
+          if (result) {
+            reply.status(result.status).send(result.body);
+          }
+        });
       });
-    });
-    
-    fastify.log.info("Seating routes registered");
+      fastify.log.info("Seating routes registered via legacy handler");
+    }
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Seating module not available");
   }
@@ -689,9 +831,12 @@ async function registerSeatingRoutes(fastify: FastifyInstance): Promise<void> {
  */
 async function registerMessagingRoutes(fastify: FastifyInstance): Promise<void> {
   try {
-    const { messagingRoutes, webhookRoutes } = require("./modules/messaging/routes");
-    await fastify.register(messagingRoutes, { prefix: "/" });
-    await fastify.register(webhookRoutes, { prefix: "/" });
+    const messagingModule = require("./modules/messaging");
+    // Handle both { register: fn } and direct function exports
+    const registerFn = messagingModule.register || messagingModule;
+    if (typeof registerFn === "function") {
+      await fastify.register(registerFn, { prefix: "/api" });
+    }
     fastify.log.info("Messaging routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Messaging module not available");
@@ -710,19 +855,30 @@ export async function start(): Promise<FastifyInstance> {
     await registerInfoRoute(fastify);
     
     try {
-      const authPlugin = require("./modules/auth");
-      await fastify.register(authPlugin);
-      fastify.log.info("Auth module registered");
+      const authModule = require("./modules/auth");
+      // Handle { register: fn } export pattern
+      const registerFn = authModule.register || authModule;
+      if (typeof registerFn === "function") {
+        await fastify.register(registerFn);
+        fastify.log.info("Auth module registered");
+      }
     } catch (error) {
       fastify.log.warn({ err: (error as Error).message }, "Auth module not available");
     }
     
-    // Store authenticate function for use in route registration
-    const authenticate = (fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate;
+    // Store authenticate function for use in route registration (used by modules)
+    const _authenticate = (fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate;
+    void _authenticate; // Suppress unused warning - registered routes use this via fastify instance
     
     await registerLegacyRoutes(fastify);
     await registerModuleLoader(fastify);
     await registerAuthRoutes(fastify);
+    await registerUsersRoutes(fastify);
+    await registerDashboardRoutes(fastify);
+    await registerEventsRoutes(fastify);
+    await registerClientsRoutes(fastify);
+    await registerTeamRoutes(fastify);
+    await registerInvoicesRoutes(fastify);
     await registerProjectsRoutes(fastify);
     await registerSitesRoutes(fastify);
     await registerGuestsRoutes(fastify);

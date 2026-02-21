@@ -36,7 +36,7 @@ const {
   getGuestSeatingDetails
 } = require("./service");
 
-const { handleSeatingRoutes } = require("./routes");
+const handleSeatingRoutes = require("./routes");
 
 module.exports = {
   // Route handler for Fastify integration

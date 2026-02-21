@@ -463,23 +463,17 @@ export default function LoginPage() {
                 <p className="mt-6 text-center text-xs text-muted-foreground">
                   By signing in, you agree to our{" "}
                   <Link
-                    href="#"
+                    href="/terms"
                     className="text-[#8B6B5D] hover:underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      showToast({ title: "Coming soon", description: "Terms of Service page coming soon." });
-                    }}
+                    target="_blank"
                   >
                     Terms of Service
                   </Link>{" "}
                   and{" "}
                   <Link
-                    href="#"
+                    href="/privacy"
                     className="text-[#8B6B5D] hover:underline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      showToast({ title: "Coming soon", description: "Privacy Policy page coming soon." });
-                    }}
+                    target="_blank"
                   >
                     Privacy Policy
                   </Link>
