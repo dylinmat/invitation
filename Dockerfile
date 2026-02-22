@@ -2,6 +2,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Cache buster - forces fresh build when this timestamp changes
+# TIMESTAMP: 2026-02-22T06:30:00Z
+
 # Copy package files
 COPY package.json ./
 COPY apps/web/package.json ./apps/web/
