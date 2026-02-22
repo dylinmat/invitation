@@ -3,7 +3,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Cache buster - forces fresh build when this timestamp changes
-# TIMESTAMP: 2026-02-22T06:30:00Z
+# TIMESTAMP: 2026-02-22T14:15:00Z
+
+# Clear any cached builds
+RUN rm -rf apps/api/dist apps/web/.next
 
 # Copy package files
 COPY package.json ./
@@ -21,10 +24,10 @@ RUN npm install && \
 COPY . .
 
 # Build types package FIRST
-RUN cd packages/types && npm run build
+RUN cd packages/types && rm -rf dist && npm run build
 
-# Build API
-RUN cd apps/api && npm run build
+# Build API - clean first to avoid stale artifacts
+RUN cd apps/api && rm -rf dist && npm run build
 
 # Copy modules source (needed for runtime requires)
 RUN cp -r apps/api/src/modules apps/api/dist/
