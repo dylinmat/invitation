@@ -17,7 +17,7 @@ import { registerCors } from "./plugins/cors";
 import { registerSecurity } from "./plugins/security";
 import { registerLogging } from "./plugins/logger";
 import { registerErrorHandler } from "./plugins/error-handler";
-import { registerModuleLoader } from "./plugins/module-loader";
+// import { registerModuleLoader } from "./plugins/module-loader";
 import { registerSwagger } from "./plugins/swagger";
 
 // Type imports
