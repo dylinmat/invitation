@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1
 FROM node:20-alpine AS builder
+
+# Force rebuild by adding a unique layer
+ARG BUILD_DATE=2026-02-22T14-30-00
+RUN echo "Build date: $BUILD_DATE"
+
 WORKDIR /app
 
-# Cache buster - forces fresh build when this timestamp changes
-# TIMESTAMP: 2026-02-22T14:15:00Z
-
 # Clear any cached builds
-RUN rm -rf apps/api/dist apps/web/.next
+RUN rm -rf apps/api/dist apps/web/.next packages/types/dist
 
 # Copy package files
 COPY package.json ./
