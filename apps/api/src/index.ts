@@ -63,12 +63,6 @@ interface ReadyCheckResponse {
   };
 }
 
-interface AuthResult {
-  user: User;
-  sessionToken: string;
-  isNewUser?: boolean;
-}
-
 /**
  * Create and configure Fastify instance
  */
