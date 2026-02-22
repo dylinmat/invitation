@@ -253,6 +253,74 @@ async function authRoutes(fastify, opts) {
       user
     };
   });
+
+  /**
+   * PATCH /auth/profile
+   * Update user profile
+   */
+  fastify.patch("/profile", {
+    preHandler: [authenticateHook],
+    schema: {
+      description: "Update user profile",
+      tags: ["Auth"],
+      body: {
+        type: "object",
+        properties: {
+          fullName: { type: "string" },
+          locale: { type: "string" },
+          avatar: { type: "string" }
+        }
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            user: { type: "object" }
+          }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { fullName, locale, avatar } = request.body;
+    const userId = request.user?.id;
+    
+    if (!userId) {
+      reply.status(401);
+      return { statusCode: 401, error: "Unauthorized", message: "User not authenticated" };
+    }
+    
+    const { updateUser } = require("./repository");
+    
+    const updates = {};
+    if (fullName !== undefined) updates.full_name = fullName;
+    if (locale !== undefined) updates.locale = locale;
+    if (avatar !== undefined) updates.avatar = avatar;
+    
+    if (Object.keys(updates).length === 0) {
+      reply.status(400);
+      return { statusCode: 400, error: "Bad Request", message: "No fields to update" };
+    }
+    
+    const updatedUser = await updateUser(userId, updates);
+    if (!updatedUser) {
+      reply.status(404);
+      return { statusCode: 404, error: "Not Found", message: "User not found" };
+    }
+    
+    return { 
+      success: true, 
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        fullName: updatedUser.full_name,
+        locale: updatedUser.locale,
+        avatar: updatedUser.avatar,
+        createdAt: updatedUser.created_at,
+        updatedAt: updatedUser.updated_at
+      }
+    };
+  });
 }
 
 /**

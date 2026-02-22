@@ -219,206 +219,6 @@ export async function registerInfoRoute(fastify: FastifyInstance): Promise<void>
 }
 
 /**
- * Register Auth Routes
- */
-async function registerAuthRoutes(fastify: FastifyInstance): Promise<void> {
-  try {
-    const { registerUser, sendLoginMagicLink, loginWithMagicLink, logout, getCurrentUser } = require("./modules/auth/service");
-    const { authenticateHook, otpVerifyRateLimiter } = require("./modules/auth/middleware");
-    
-    fastify.post("/auth/register", async (request: FastifyRequest, reply: FastifyReply) => {
-      const { email, fullName } = request.body as { email: string; fullName: string };
-      if (!email || !fullName) {
-        reply.status(400);
-        return { statusCode: 400, error: "Bad Request", message: "email and fullName are required" };
-      }
-      const result = await registerUser(email, fullName);
-      reply.status(201);
-      return { success: true, user: result.user, message: result.message };
-    });
-    
-    fastify.post("/auth/magic-link", async (request: FastifyRequest, reply: FastifyReply) => {
-      const { email } = request.body as { email: string };
-      if (!email) {
-        reply.status(400);
-        return { statusCode: 400, error: "Bad Request", message: "email is required" };
-      }
-      const result = await sendLoginMagicLink(email);
-      return { success: true, message: result.message };
-    });
-    
-    fastify.post("/auth/otp/verify", async (request: FastifyRequest) => {
-      const { token } = request.body as { token: string };
-      const result: AuthResult = await loginWithMagicLink(token, {
-        ipAddress: request.ip,
-        userAgent: request.headers["user-agent"]
-      });
-      const user = result.user as User & { name?: string; avatar?: string };
-      return {
-        success: true,
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          name: user.name || result.user.fullName,
-          avatar: user.avatar || null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        token: result.sessionToken,
-        isNewUser: result.isNewUser
-      };
-    });
-    
-    fastify.post("/auth/logout", {
-      preHandler: [authenticateHook],
-      schema: {
-        description: "Logout user and invalidate session",
-        tags: ["Auth"],
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              success: { type: "boolean" },
-              message: { type: "string" }
-            }
-          }
-        }
-      }
-    }, async (request: FastifyRequest, reply: FastifyReply) => {
-      await logout((request as any).sessionToken as string);
-      (reply as any).clearCookie("session_token");
-      return { success: true, message: "Logged out successfully" };
-    });
-    
-    fastify.get("/auth/me", {
-      preHandler: [authenticateHook],
-      schema: {
-        description: "Get current authenticated user",
-        tags: ["Auth"],
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              success: { type: "boolean" },
-              user: { type: "object" }
-            }
-          }
-        }
-      }
-    }, async (request: FastifyRequest) => {
-      const user = await getCurrentUser(request.user?.id as string);
-      if (!user) {
-        const error = new Error("User not found");
-        (error as any).statusCode = 404;
-        throw error;
-      }
-      return { success: true, user };
-    });
-    
-    fastify.patch("/auth/profile", {
-      preHandler: [authenticateHook],
-      schema: {
-        description: "Update user profile",
-        tags: ["Auth"],
-        body: {
-          type: "object",
-          properties: {
-            fullName: { type: "string" },
-            locale: { type: "string" },
-            avatar: { type: "string" }
-          }
-        },
-        response: {
-          200: {
-            type: "object",
-            properties: {
-              success: { type: "boolean" },
-              user: { type: "object" }
-            }
-          }
-        }
-      }
-    }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const { fullName, locale, avatar } = request.body as { fullName?: string; locale?: string; avatar?: string };
-      const userId = request.user?.id as string;
-      
-      // Import repository function
-      const { updateUser } = require("./modules/auth/repository");
-      
-      const updates: Record<string, string> = {};
-      if (fullName !== undefined) updates.full_name = fullName;
-      if (locale !== undefined) updates.locale = locale;
-      if (avatar !== undefined) updates.avatar = avatar;
-      
-      if (Object.keys(updates).length === 0) {
-        reply.status(400);
-        return { statusCode: 400, error: "Bad Request", message: "No fields to update" };
-      }
-      
-      const updatedUser = await updateUser(userId, updates);
-      if (!updatedUser) {
-        const error = new Error("User not found");
-        (error as any).statusCode = 404;
-        throw error;
-      }
-      
-      return { 
-        success: true, 
-        user: {
-          id: updatedUser.id,
-          email: updatedUser.email,
-          fullName: updatedUser.full_name,
-          locale: updatedUser.locale,
-          avatar: updatedUser.avatar,
-          createdAt: updatedUser.created_at,
-          updatedAt: updatedUser.updated_at
-        }
-      };
-    });
-    
-    // Add alias for OTP verify to maintain compatibility
-    fastify.post("/auth/otp/verify", {
-      preHandler: [otpVerifyRateLimiter],
-      schema: {
-        description: "Verify magic link token and create session (alias for /auth/verify)",
-        tags: ["Auth"],
-        body: {
-          type: "object",
-          required: ["token"],
-          properties: {
-            token: { type: "string" }
-          }
-        }
-      }
-    }, async (request: FastifyRequest, reply: FastifyReply) => {
-      const { token } = request.body as { token: string };
-      const result: AuthResult = await loginWithMagicLink(token, {
-        ipAddress: request.ip,
-        userAgent: request.headers["user-agent"]
-      });
-      
-      (reply as any).setCookie("session_token", result.sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000
-      });
-      
-      return {
-        success: true,
-        user: result.user,
-        token: result.sessionToken,
-        isNewUser: result.isNewUser
-      };
-    });
-    
-    fastify.log.info("Auth routes registered");
-  } catch (error) {
-    fastify.log.warn({ err: (error as Error).message }, "Auth routes not available");
-  }
-}
-
-/**
  * Register legacy routes
  */
 export async function registerLegacyRoutes(fastify: FastifyInstance): Promise<void> {
@@ -626,11 +426,9 @@ async function registerDashboardRoutes(fastify: FastifyInstance): Promise<void> 
 async function registerEventsRoutes(fastify: FastifyInstance): Promise<void> {
   try {
     const eventsModule = require("./modules/events");
-    // Handle both { register: fn } and direct function exports
-    const registerFn = eventsModule.register || eventsModule;
-    if (typeof registerFn === "function") {
-      await fastify.register(registerFn, { prefix: "/api/events" });
-    }
+    // Use eventRoutes directly to avoid double prefix
+    // eventsModule.register adds its own /events prefix, so we don't use that
+    await fastify.register(eventsModule.eventRoutes, { prefix: "/api/events" });
     fastify.log.info("Events routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Events routes not available");
@@ -643,11 +441,8 @@ async function registerEventsRoutes(fastify: FastifyInstance): Promise<void> {
 async function registerClientsRoutes(fastify: FastifyInstance): Promise<void> {
   try {
     const clientsModule = require("./modules/clients");
-    // Handle both { register: fn } and direct function exports
-    const registerFn = clientsModule.register || clientsModule;
-    if (typeof registerFn === "function") {
-      await fastify.register(registerFn, { prefix: "/api/clients" });
-    }
+    // Use clientRoutes directly to avoid double prefix
+    await fastify.register(clientsModule.clientRoutes, { prefix: "/api/clients" });
     fastify.log.info("Clients routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Clients routes not available");
@@ -660,11 +455,7 @@ async function registerClientsRoutes(fastify: FastifyInstance): Promise<void> {
 async function registerTeamRoutes(fastify: FastifyInstance): Promise<void> {
   try {
     const teamModule = require("./modules/team");
-    // Handle both { register: fn } and direct function exports
-    const registerFn = teamModule.register || teamModule;
-    if (typeof registerFn === "function") {
-      await fastify.register(registerFn, { prefix: "/api/team" });
-    }
+    await fastify.register(teamModule.teamRoutes, { prefix: "/api/team" });
     fastify.log.info("Team routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Team routes not available");
@@ -677,11 +468,7 @@ async function registerTeamRoutes(fastify: FastifyInstance): Promise<void> {
 async function registerInvoicesRoutes(fastify: FastifyInstance): Promise<void> {
   try {
     const invoicesModule = require("./modules/invoices");
-    // Handle both { register: fn } and direct function exports
-    const registerFn = invoicesModule.register || invoicesModule;
-    if (typeof registerFn === "function") {
-      await fastify.register(registerFn, { prefix: "/api/invoices" });
-    }
+    await fastify.register(invoicesModule.invoiceRoutes, { prefix: "/api/invoices" });
     fastify.log.info("Invoices routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Invoices routes not available");
@@ -694,12 +481,8 @@ async function registerInvoicesRoutes(fastify: FastifyInstance): Promise<void> {
 async function registerGuestsRoutes(fastify: FastifyInstance): Promise<void> {
   try {
     const guestsModule = require("./modules/guests");
-    // Handle both { register: fn } and direct function exports
-    const registerFn = guestsModule.register || guestsModule;
-    if (typeof registerFn === "function") {
-      await fastify.register(registerFn, { prefix: "/api" });
-    }
-    fastify.log.info("Guests routes registered via module");
+    await fastify.register(guestsModule.guestRoutes, { prefix: "/api" });
+    fastify.log.info("Guests routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Guests module not available");
   }
@@ -832,11 +615,7 @@ async function registerSeatingRoutes(fastify: FastifyInstance): Promise<void> {
 async function registerMessagingRoutes(fastify: FastifyInstance): Promise<void> {
   try {
     const messagingModule = require("./modules/messaging");
-    // Handle both { register: fn } and direct function exports
-    const registerFn = messagingModule.register || messagingModule;
-    if (typeof registerFn === "function") {
-      await fastify.register(registerFn, { prefix: "/api" });
-    }
+    await fastify.register(messagingModule.messagingRoutes, { prefix: "/api" });
     fastify.log.info("Messaging routes registered");
   } catch (error) {
     fastify.log.warn({ err: (error as Error).message }, "Messaging module not available");
@@ -869,7 +648,6 @@ export async function start(): Promise<FastifyInstance> {
     await registerLegacyRoutes(fastify);
     // Skip module loader - it creates encapsulation issues with auth decorator
     // await registerModuleLoader(fastify);
-    await registerAuthRoutes(fastify);
     await registerUsersRoutes(fastify);
     await registerDashboardRoutes(fastify);
     await registerEventsRoutes(fastify);

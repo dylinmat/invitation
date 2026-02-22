@@ -5,13 +5,16 @@
 
 module.exports = async function (fastify, opts) {
   const dashboardService = require('./service')(fastify);
+  
+  // Get authenticate hook from fastify OR opts fallback
+  const authenticate = fastify.authenticate || opts.authenticate;
 
   /**
    * GET /api/dashboard/couple
    * Get couple dashboard data
    */
   fastify.get('/couple', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     handler: async (request, reply) => {
       try {
         const userId = request.user.id;
@@ -47,7 +50,7 @@ module.exports = async function (fastify, opts) {
    * Get business dashboard data
    */
   fastify.get('/business', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     handler: async (request, reply) => {
       try {
         const userId = request.user.id;
@@ -83,7 +86,7 @@ module.exports = async function (fastify, opts) {
    * Send RSVP reminders
    */
   fastify.post('/events/:id/reminders', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     schema: {
       body: {
         type: 'object',
@@ -121,7 +124,7 @@ module.exports = async function (fastify, opts) {
    * Get checklist items
    */
   fastify.get('/checklist', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     handler: async (request, reply) => {
       try {
         const organizationId = request.user.organization_id;
@@ -156,7 +159,7 @@ module.exports = async function (fastify, opts) {
    * Create checklist item
    */
   fastify.post('/checklist', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     schema: {
       body: {
         type: 'object',
@@ -198,7 +201,7 @@ module.exports = async function (fastify, opts) {
    * Update checklist item (toggle completion)
    */
   fastify.put('/checklist/:id', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     schema: {
       body: {
         type: 'object',
@@ -272,7 +275,7 @@ module.exports = async function (fastify, opts) {
    * Delete checklist item
    */
   fastify.delete('/checklist/:id', {
-    onRequest: [fastify.authenticate],
+    onRequest: authenticate ? [authenticate] : [],
     handler: async (request, reply) => {
       try {
         const itemId = request.params.id;
