@@ -167,6 +167,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-amber-300 to-amber-500 rounded-lg flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
               <span className="text-2xl font-serif font-semibold text-stone-900">EIOS</span>
             </Link>
 
@@ -463,16 +466,18 @@ export default function LandingPage() {
       <footer className="py-12 bg-stone-50 border-t border-stone-200">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-gradient-to-br from-amber-300 to-amber-500 rounded-lg flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-white" />
+              </div>
               <span className="text-xl font-serif font-semibold text-stone-900">EIOS</span>
-            </div>
+            </Link>
             <p className="text-sm text-stone-500">
               © {new Date().getFullYear()} Event Invitation OS. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
-              <Link href="#" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">Privacy</Link>
-              <Link href="#" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">Terms</Link>
-              <Link href="#" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">Pricing</Link>
+              <Link href="/privacy" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">Privacy</Link>
+              <Link href="/terms" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">Terms</Link>
             </div>
           </div>
         </div>
