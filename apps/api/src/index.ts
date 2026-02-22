@@ -866,12 +866,9 @@ export async function start(): Promise<FastifyInstance> {
       fastify.log.warn({ err: (error as Error).message }, "Auth module not available");
     }
     
-    // Store authenticate function for use in route registration (used by modules)
-    const _authenticate = (fastify as unknown as { authenticate?: (req: FastifyRequest, reply: FastifyReply) => Promise<void> }).authenticate;
-    void _authenticate; // Suppress unused warning - registered routes use this via fastify instance
-    
     await registerLegacyRoutes(fastify);
-    await registerModuleLoader(fastify);
+    // Skip module loader - it creates encapsulation issues with auth decorator
+    // await registerModuleLoader(fastify);
     await registerAuthRoutes(fastify);
     await registerUsersRoutes(fastify);
     await registerDashboardRoutes(fastify);

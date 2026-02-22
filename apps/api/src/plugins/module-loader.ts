@@ -18,6 +18,7 @@ interface ModuleDefinition {
 
 interface ModuleOptions {
   prefix?: string;
+  authenticate?: (req: import("fastify").FastifyRequest, reply: import("fastify").FastifyReply) => Promise<void>;
 }
 
 /**
@@ -47,21 +48,42 @@ function validateModule(module: unknown, moduleName: string): module is ModuleDe
 
 /**
  * Get list of modules to load
+ * Auth module is loaded first to set up decorators like 'authenticate'
  */
 function getModuleList(): string[] {
   const modulesPath = MODULES.AUTOLOAD_PATH;
   
   if (MODULES.ENABLED.length > 0) {
-    return MODULES.ENABLED;
+    // Ensure auth is first if it's in the enabled list
+    const enabled = [...MODULES.ENABLED];
+    const authIndex = enabled.indexOf("auth");
+    if (authIndex > 0) {
+      enabled.splice(authIndex, 1);
+      enabled.unshift("auth");
+    }
+    return enabled;
   }
   
   try {
     const entries = fs.readdirSync(modulesPath, { withFileTypes: true });
-    return entries
+    const modules = entries
       .filter(entry => entry.isDirectory())
       .map(entry => entry.name)
-      .filter(name => !name.startsWith("_"))
-      .sort();
+      .filter(name => !name.startsWith("_"));
+    
+    // Load auth first so it can set up decorators
+    const authIndex = modules.indexOf("auth");
+    if (authIndex > 0) {
+      modules.splice(authIndex, 1);
+      modules.unshift("auth");
+    }
+    
+    return modules.sort((a, b) => {
+      // Auth always comes first
+      if (a === "auth") return -1;
+      if (b === "auth") return 1;
+      return a.localeCompare(b);
+    });
   } catch (error) {
     console.warn(`Could not read modules directory: ${modulesPath}`, (error as Error).message);
     return [];
@@ -117,9 +139,16 @@ async function loadModule(
   } else if (typeof module === "object" && module !== null) {
     validateModule(module, moduleName);
     
-    if (module.register) {
+    if (module.register && typeof module.register === "function") {
+      // Object with register function - Fastify plugin pattern
+      // Pass authenticate hook in options for modules that need it
       await fastify.register(module.register, { prefix, ...options });
-    } else if (module.routes) {
+    } else if (module.routes && typeof module.routes === "function") {
+      // Object with routes function - Fastify plugin pattern (e.g., dashboard module)
+      // Pass authenticate hook in options for routes that need it
+      await fastify.register(module.routes, { prefix, ...options });
+    } else if (module.routes && Array.isArray(module.routes)) {
+      // Object with routes array - manual route registration
       await fastify.register(async (instance) => {
         for (const route of module.routes || []) {
           instance.route(route);
@@ -148,19 +177,20 @@ async function loadAllModules(fastify: FastifyInstance, options: ModuleOptions =
   
   fastify.log.info(`Loading ${modules.length} module(s)...`);
   
-  const results = await Promise.allSettled(
-    modules.map(name => loadModule(fastify, name, options))
-  );
+  // Load modules sequentially to ensure auth is set up before dependent modules
+  let loaded = 0;
+  let failed = 0;
   
-  const loaded = results.filter(r => r.status === "fulfilled" && r.value).length;
-  const failed = results.filter(r => r.status === "rejected").length;
-  
-  if (failed > 0) {
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        fastify.log.error({ err: result.reason }, `Failed to load module: ${modules[index]}`);
+  for (const name of modules) {
+    try {
+      const result = await loadModule(fastify, name, options);
+      if (result) {
+        loaded++;
       }
-    });
+    } catch (error) {
+      failed++;
+      fastify.log.error({ err: error }, `Failed to load module: ${name}`);
+    }
   }
   
   fastify.log.info(`Modules loaded: ${loaded}/${modules.length}`);
