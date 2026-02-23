@@ -35,7 +35,7 @@ const PHOTOS = {
   beachCelebration: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80",
   babyShower: "https://images.unsplash.com/photo-1519689680058-324335c77eba?w=400&q=80",
   anniversary: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=80",
-  graduation: "https://images.unsplash.com/photo-1541872703-74c5963631df?w=400&q=80",
+  graduation: "https://images.unsplash.com/photo-1525921429624-479b6a26d84d?w=400&q=80",
   engagement: "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?w=400&q=80",
   step1: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80",
   step2: "https://images.unsplash.com/photo-1561336313-0bd5e0b27ec8?w=600&q=80",
