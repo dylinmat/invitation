@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -30,6 +31,9 @@ import {
   Fingerprint,
   ArrowRight,
 } from "lucide-react";
+
+// Background image for login page
+const LOGIN_BG_IMAGE = "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=80";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -158,11 +162,17 @@ export default function LoginPage() {
         transition={{ duration: 0.6 }}
         className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden"
       >
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#8B6B5D]/10 via-transparent to-[#D4A574]/10" />
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-[#D4A574]/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-[#8B6B5D]/20 rounded-full blur-3xl" />
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <Image
+            src={LOGIN_BG_IMAGE}
+            alt="Beautiful wedding celebration"
+            fill
+            className="object-cover"
+            priority
+          />
+          {/* Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#2C1810]/80 via-[#2C1810]/60 to-[#8B6B5D]/70" />
         </div>
 
         {/* Content */}
@@ -172,7 +182,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-[#8B6B5D] to-[#D4A574] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
               <Calendar className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-[#8B6B5D] to-[#D4A574] bg-clip-text text-transparent">
+            <span className="text-2xl font-bold text-white">
               EIOS
             </span>
           </Link>
@@ -194,7 +204,7 @@ export default function LoginPage() {
                     <Star key={i} className="w-5 h-5 fill-[#D4A574] text-[#D4A574]" />
                   ))}
                 </div>
-                <blockquote className="text-2xl xl:text-3xl font-medium text-[#2C1810] leading-relaxed mb-6">
+                <blockquote className="text-2xl xl:text-3xl font-medium text-white leading-relaxed mb-6">
                   "{testimonials[currentTestimonial].quote}"
                 </blockquote>
                 <div className="flex items-center gap-4">
@@ -202,10 +212,10 @@ export default function LoginPage() {
                     {testimonials[currentTestimonial].author.split(" ").map(n => n[0]).join("")}
                   </div>
                   <div>
-                    <p className="font-semibold text-[#2C1810]">
+                    <p className="font-semibold text-white">
                       {testimonials[currentTestimonial].author}
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-white/70">
                       {testimonials[currentTestimonial].role} at {testimonials[currentTestimonial].company}
                     </p>
                   </div>
@@ -223,25 +233,25 @@ export default function LoginPage() {
                   transition={{ delay: 0.2 + index * 0.1 }}
                   className="text-center"
                 >
-                  <p className="text-2xl font-bold text-[#8B6B5D]">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                  <p className="text-2xl font-bold text-[#D4A574]">{stat.value}</p>
+                  <p className="text-xs text-white/60 mt-1">{stat.label}</p>
                 </motion.div>
               ))}
             </div>
           </div>
 
           {/* Trust Badges */}
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-6 text-sm text-white/70">
             <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-green-600" />
+              <Shield className="w-4 h-4 text-green-400" />
               <span>SOC 2 Certified</span>
             </div>
             <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-green-600" />
+              <Lock className="w-4 h-4 text-green-400" />
               <span>256-bit Encryption</span>
             </div>
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-500" />
+              <Zap className="w-4 h-4 text-amber-400" />
               <span>99.9% Uptime</span>
             </div>
           </div>
